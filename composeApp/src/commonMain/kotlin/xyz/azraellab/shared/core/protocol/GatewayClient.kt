@@ -26,6 +26,7 @@ class GatewayClient(private val baseUrl: String, private val box: SessionBox = S
             val pub = obj["srv_pub"]?.jsonPrimitive?.content ?: return null
             val token = obj["session"]?.jsonPrimitive?.content ?: return null
             val role = obj["role"]?.jsonPrimitive?.content ?: "guest"
+            if (!box.acceptServer(pub, token)) return null
             HandshakeReply(pub, token, role)
         }.getOrNull()
 
@@ -63,5 +64,5 @@ class GatewayClient(private val baseUrl: String, private val box: SessionBox = S
     private fun jsonQuote(s: String): String =
         "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 }

@@ -41,5 +41,15 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
         }
+        val desktopTest by getting
+        desktopTest.dependencies {
+            implementation(kotlin("test"))
+        }
+    }
+    tasks.withType<Test>().configureEach {
+        testLogging {
+            showStandardStreams = true
+            events("passed", "skipped", "failed")
+        }
     }
 }

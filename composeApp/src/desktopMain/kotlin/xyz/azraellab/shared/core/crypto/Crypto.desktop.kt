@@ -27,7 +27,8 @@ actual object Crypto {
         val kf = KeyFactory.getInstance("X25519")
         val privSpec = java.security.spec.PKCS8EncodedKeySpec(priv)
         val privKey = kf.generatePrivate(privSpec)
-        val pubSpec = XECPublicKeySpec(java.security.spec.NamedParameterSpec.X25519, java.math.BigInteger(1, pub))
+        // X25519 кодирует координату little-endian; JCA BigInteger ждёт big-endian.
+        val pubSpec = XECPublicKeySpec(java.security.spec.NamedParameterSpec.X25519, java.math.BigInteger(1, pub.reversedArray()))
         val pubKey = kf.generatePublic(pubSpec)
         val ka = KeyAgreement.getInstance("X25519")
         ka.init(privKey)
