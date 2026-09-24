@@ -2,10 +2,12 @@ package xyz.azraellab.shared.core.crypto
 
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.spec.XECPublicKeySpec
 import javax.crypto.Cipher
 import javax.crypto.KeyAgreement
+import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
@@ -55,4 +57,14 @@ actual object Crypto {
     } catch (e: Exception) {
         null
     }
+
+    actual fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray = try {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(key, "HmacSHA256"))
+        mac.doFinal(data)
+    } catch (e: Exception) {
+        throw IllegalStateException("HmacSHA256 unavailable", e)
+    }
+
+    actual fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
 }

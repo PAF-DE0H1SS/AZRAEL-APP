@@ -15,6 +15,12 @@ expect object Crypto {
 
     /** AEAD-decrypt. Возвращает plain|null при неудаче. */
     fun decrypt(key: ByteArray, aad: ByteArray, cipher: ByteArray, nonce: ByteArray): ByteArray?
+
+    /** HMAC-SHA256 для подписи запросов/ответов кастомного API. */
+    fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray
+
+    /** SHA-256 для детерминированного хэша тела (анти-подмена). */
+    fun sha256(data: ByteArray): ByteArray
 }
 
 data class KeyPairData(val publicKey: ByteArray, val privateKey: ByteArray)
