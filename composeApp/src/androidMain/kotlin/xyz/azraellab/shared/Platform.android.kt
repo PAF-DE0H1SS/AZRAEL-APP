@@ -96,6 +96,24 @@ actual object AppVault {
             true
         }.getOrDefault(false)
     }
+
+    // Ключ канала лежит рядом с vault, отдельным файлом: им читает AppVault ещё
+    // до того, как собран AppClient (в конструкторе нужен ключ, а не наоборот).
+    private fun appKeyFile(): File = File(baseDir(), "app-key")
+
+    actual fun readAppKey(): String? = runCatching {
+        val f = appKeyFile()
+        if (!f.isFile) return null
+        f.readText().trim().takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    actual fun writeAppKey(keyB64: String): Boolean = runCatching {
+        val f = appKeyFile()
+        val dir = f.parentFile
+        if (!dir.exists()) dir.mkdirs()
+        f.writeText(keyB64.trim())
+        true
+    }.getOrDefault(false)
 }
 
 /** Язык интерфейса на Android: тот же каталог установки, что и у vault. */

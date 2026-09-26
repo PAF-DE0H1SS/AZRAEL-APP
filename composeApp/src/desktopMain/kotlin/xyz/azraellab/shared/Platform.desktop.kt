@@ -140,6 +140,36 @@ actual object AppVault {
             true
         }.getOrDefault(false)
     }
+
+    // Ключ канала лежит рядом с vault, отдельным файлом: им читает AppVault ещё
+    // до того, как собран AppClient (в конструкторе нужен ключ, а не наоборот).
+    private fun appKeyFile(): File {
+        val home = System.getProperty("user.home") ?: "."
+        return File(home, ".config/azraellab/app-key")
+    }
+
+    actual fun readAppKey(): String? = runCatching {
+        val f = appKeyFile()
+        if (!f.isFile) return null
+        f.readText().trim().takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    actual fun writeAppKey(keyB64: String): Boolean = runCatching {
+        val f = appKeyFile()
+        val parent = f.parentFile
+        if (!parent.exists()) parent.mkdirs()
+        val tmp = Path.of(f.absolutePath + ".tmp")
+        Files.write(tmp, keyB64.trim().toByteArray(Charsets.UTF_8))
+        Files.move(tmp, Path.of(f.absolutePath), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        try {
+            f.setReadable(false, false)
+            f.setReadable(true, true)
+            f.setWritable(false, false)
+            f.setWritable(true, true)
+        } catch (_: Exception) {
+        }
+        true
+    }.getOrDefault(false)
 }
 
 /** Язык интерфейса на десктопе: ~/.config/azraellab/lang, рядом с vault (не секрет). */

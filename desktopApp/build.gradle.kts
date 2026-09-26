@@ -18,7 +18,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.AppImage)
             packageName = "xyz.azraellab.app"
-            packageVersion = "1.0.0"
+            packageVersion = "1.1.0"
             description = "AZRAEL-APP - client for azrael-lab.xyz"
             vendor = "AZRAEL Lab"
         }

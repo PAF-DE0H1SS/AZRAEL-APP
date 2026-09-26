@@ -64,6 +64,8 @@ fun GlassBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
         AmbientGlow(color = AzraelViolet, size = 420.dp, alpha = 0.16f, Modifier.align(Alignment.TopStart))
         AmbientGlow(color = AzraelCyan, size = 380.dp, alpha = 0.12f, Modifier.align(Alignment.TopEnd))
         AmbientGlow(color = AzraelRose, size = 460.dp, alpha = 0.10f, Modifier.align(Alignment.BottomEnd))
+        // Звёзды и белые кометы как на сайте (/e2) — под контентом, мышь не ловит.
+        StarfieldBackground(Modifier.matchParentSize())
         content()
     }
 }

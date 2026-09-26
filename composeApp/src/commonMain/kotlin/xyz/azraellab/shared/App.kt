@@ -1,5 +1,6 @@
 package xyz.azraellab.shared
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,8 +19,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +65,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,18 +84,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -102,12 +113,13 @@ import kotlinx.serialization.json.jsonPrimitive
 import xyz.azraellab.shared.core.api.AppClient
 import xyz.azraellab.shared.core.api.AppErrorCode
 import xyz.azraellab.shared.core.api.AppException
+import xyz.azraellab.shared.core.api.AppKeyBootstrap
 import xyz.azraellab.shared.core.api.AppSecure
 import xyz.azraellab.shared.core.api.ThreatMode
+import xyz.azraellab.shared.core.crypto.Base64Codec
 import xyz.azraellab.shared.core.api.AppErrorCode.NETWORK
 import xyz.azraellab.shared.core.protocol.AppRuntime
 import xyz.azraellab.shared.core.protocol.GatewayClient
-import xyz.azraellab.shared.core.protocol.defaultAppKeyB64
 import xyz.azraellab.shared.core.protocol.defaultAppSrvPubB64
 import xyz.azraellab.shared.core.protocol.defaultAppUrl
 import xyz.azraellab.shared.core.protocol.defaultGatewayUrl
@@ -274,16 +286,62 @@ private fun applyBootLang(boot: JsonObject) {
     I18n.applyServer(lang)
 }
 
+/** Состояние автоматического получения ключа канала: пользователь его не вводит. */
+private sealed interface ChannelKey {
+    data object Loading : ChannelKey
+    data class Ready(val keyB64: String) : ChannelKey
+    data class Failed(val reason: String) : ChannelKey
+}
+
+/**
+ * Ключ канала для адреса API: из AppVault, иначе одноразовый запрос
+ * `GET /api/app/bootstrap`. Адрес и ключ не вводятся и не показываются.
+ *
+ * Возвращает состояние и повтор: [ChannelScreen] не может сменить состояние сам,
+ * поэтому «Повторить» поднимает счётчик попыток и перезапускает LaunchedEffect.
+ */
+@Composable
+private fun rememberChannelKey(baseUrl: String): Pair<ChannelKey, () -> Unit> {
+    var attempt by remember(baseUrl) { mutableStateOf(0) }
+    var state by remember(baseUrl) { mutableStateOf<ChannelKey>(ChannelKey.Loading) }
+    LaunchedEffect(baseUrl, attempt) {
+        state = ChannelKey.Loading
+        // Сеть/файл могут бросить исключение — тогда это такой же провал, как пустой ответ.
+        val keyB64 = withContext(Dispatchers.IO) {
+            runCatching {
+                val cached = AppVault.readAppKey()
+                if (!cached.isNullOrBlank()) cached
+                else AppKeyBootstrap.fetch(baseUrl)?.let { fresh ->
+                    Base64Codec.encode(fresh).also { AppVault.writeAppKey(it) }
+                }
+            }.getOrNull()
+        }
+        state = if (keyB64.isNullOrBlank()) {
+            ChannelKey.Failed(t["channel.key.failed"])
+        } else {
+            ChannelKey.Ready(keyB64)
+        }
+    }
+    return state to { attempt++ }
+}
+
 @Composable
 private fun AppRoot(nativeGreeting: () -> String) {
-    var baseUrl by remember { mutableStateOf(defaultAppUrl() ?: "") }
-    var keyB64 by remember { mutableStateOf(defaultAppKeyB64() ?: "") }
+    // Адрес и ключ не редактируются: они приходят из сборки и с сервера автоматически.
+    val baseUrl = remember { normalizedEndpoint(defaultAppUrl().orEmpty()) ?: "https://azrael-lab.xyz/api/app/v1" }
+    val (channel, retryChannelKey) = rememberChannelKey(baseUrl)
     var session by remember { mutableStateOf<Session?>(null) }
     val scope = rememberCoroutineScope()
 
     // Режим защиты (могила на устройстве либо серверное «отравление» канала).
     var threatMode by remember { mutableStateOf<ThreatMode?>(if (AppTrap.isProtected()) ThreatMode.TRAPPED else null) }
     val onThreat: (ThreatMode) -> Unit = { mode: ThreatMode -> threatMode = mode }
+
+    val keyB64 = (channel as? ChannelKey.Ready)?.keyB64
+    if (keyB64 == null) {
+        ChannelScreen(channel, retryChannelKey)
+        return
+    }
 
     val currentThreat = threatMode
     if (currentThreat != null) {
@@ -314,10 +372,7 @@ private fun AppRoot(nativeGreeting: () -> String) {
             }.onFailure { resumeError = errText(it) }
         }
         LoginScreen(
-            baseUrl = baseUrl,
-            keyB64 = keyB64,
-            onBaseUrl = { baseUrl = it },
-            onKeyB64 = { keyB64 = it },
+            client = bound,
             onThreat = onThreat,
             initStatus = resumeError,
             onLoggedIn = { session = it }
@@ -329,10 +384,6 @@ private fun AppRoot(nativeGreeting: () -> String) {
             session = current,
             boot = boot,
             bootTick = bootTick,
-            baseUrl = baseUrl,
-            keyB64 = keyB64,
-            onBaseUrl = { baseUrl = it },
-            onKeyB64 = { keyB64 = it },
             onThreat = onThreat,
             onRefreshBoot = {
                 val c = current.client
@@ -396,9 +447,10 @@ private fun ProtectionScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            t("protection.deviceId", AppTrap.deviceId()),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.45f)
+            t["protection.desc3"],
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(20.dp))
         // Снятие могилы подтверждается сервером (x-azrael-release в подписанном конверте):
@@ -436,147 +488,865 @@ private fun ProtectionScreen(
     }
 }
 
-// ---- Вход: ключ приложения + логин/пароль (+ привязка установки) ----
+// ---- Получение ключа канала: автоматически, без ввода пользователем ----
 
-@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChannelScreen(channel: ChannelKey, onRetry: () -> Unit) {
+    val failed = channel as? ChannelKey.Failed
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            t["app.name"],
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+        Spacer(Modifier.height(14.dp))
+        if (failed == null) {
+            CircularProgressIndicator(color = AzraelCyan)
+            Spacer(Modifier.height(14.dp))
+            Text(
+                t["channel.key.loading"],
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White
+            )
+        } else {
+            Icon(Icons.Filled.Block, contentDescription = null, tint = AzraelRose, modifier = Modifier.height(44.dp))
+            Spacer(Modifier.height(10.dp))
+            Text(
+                failed.reason,
+                style = MaterialTheme.typography.bodyLarge,
+                color = AzraelRose,
+                textAlign = TextAlign.Center
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            t["channel.key.loading.hint"],
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.65f),
+            textAlign = TextAlign.Center
+        )
+        if (failed != null) {
+            Spacer(Modifier.height(16.dp))
+            // Повтор: ключ мог не загрузиться из-за сети — перезапускаем получение.
+            AccentButton(t["channel.key.retry"], onClick = onRetry)
+        }
+    }
+}
+
+// ---- Вход и регистрация аккаунта (пароль, инвайт, пол, аватар) ----
+// Оформление повторяет /login сайта (app/login/page.tsx): узкая карточка по центру,
+// сегмент-переключатель вкладок, «стеклянные» поля, чипы выбора, аватар-круг
+// и полноширинная кнопка действия. Фирменные цвета и фон — из ui/Theme.kt.
+
+private enum class AuthTab { Login, Register }
+
 @Composable
 private fun LoginScreen(
-    baseUrl: String,
-    keyB64: String,
-    onBaseUrl: (String) -> Unit,
-    onKeyB64: (String) -> Unit,
+    client: AppClient,
     onThreat: (ThreatMode) -> Unit,
     initStatus: String?,
     onLoggedIn: (Session) -> Unit
 ) {
-    val bootstrap = remember(baseUrl, keyB64) { makeClient(baseUrl, keyB64) }
-    var username by remember { mutableStateOf(bootstrap.rememberedLogin()) }
-    var rememberDevice by remember { mutableStateOf(bootstrap.hasRememberedAccount()) }
-    var deviceKey by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf(initStatus ?: "") }
+    // rememberSaveable, а не remember: поворот экрана, смена темы/языка или смерть
+    // процесса пересоздают Activity — форма входа не должна молча очищаться.
+    var tab by rememberSaveable { mutableStateOf(AuthTab.Login) }
+    var username by rememberSaveable { mutableStateOf(client.rememberedLogin()) }
+    var password by rememberSaveable { mutableStateOf("") }
+    var password2 by rememberSaveable { mutableStateOf("") }
+    var deviceKey by rememberSaveable { mutableStateOf("") }
+    var inviteCode by rememberSaveable { mutableStateOf("") }
+    var displayName by rememberSaveable { mutableStateOf("") }
+    var gender by rememberSaveable { mutableStateOf("") }
+    // Аватар остаётся в remember: это base64 до 10 МиБ, в savedInstanceState он не влезет.
+    var avatar by remember { mutableStateOf<PickedFile?>(null) }
+    var showPassword by rememberSaveable { mutableStateOf(false) }
+    var rememberDevice by rememberSaveable { mutableStateOf(client.hasRememberedAccount()) }
+    var status by rememberSaveable { mutableStateOf(initStatus ?: "") }
     // Флаг «это ошибка»: раньше цвет определялся по русским префиксам, что не переводится.
-    var statusError by remember { mutableStateOf(false) }
+    var statusError by rememberSaveable { mutableStateOf(initStatus != null && initStatus.isNotBlank()) }
+    var busy by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    // Уже привязанная установка: вход по логину/паролю без ключа привязки —
+    // подпись устройства уже подтверждена, ключ выдавать не нужно.
+    val alreadyBound = remember { client.isDeviceBound() }
+
+    fun fail(message: String) {
+        status = message
+        statusError = true
+        busy = false
+    }
+
+    fun clearError() {
+        if (statusError) {
+            status = ""
+            statusError = false
+        }
+    }
+
+    fun switchTab(next: AuthTab) {
+        if (busy || tab == next) return
+        tab = next
+        status = ""
+        statusError = false
+    }
+
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 460.dp)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 20.dp, vertical = 26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            BrandMark()
+            Spacer(Modifier.height(18.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .glass(corner = 26.dp, borderColor = Color.White.copy(alpha = 0.12f))
+                    .padding(horizontal = 18.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        if (tab == AuthTab.Login) t["login.tab.login"] else t["login.tab.register"],
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.95f)
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        if (tab == AuthTab.Login) t["login.access.note"] else t["login.register.hint"],
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.45f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                AuthTabs(selected = tab, enabled = !busy, onSelect = ::switchTab)
+
+                if (status.isNotBlank()) StatusBanner(status, statusError)
+
+                if (tab == AuthTab.Login) {
+                    AuthField(
+                        value = username,
+                        onValueChange = { username = it; clearError() },
+                        label = t["login.username"],
+                        accent = AzraelViolet,
+                        leading = Icons.Filled.Person,
+                        enabled = !busy
+                    )
+                    AuthField(
+                        value = password,
+                        onValueChange = { password = it; clearError() },
+                        label = t["login.password.new"],
+                        accent = AzraelViolet,
+                        leading = Icons.Filled.Key,
+                        isPassword = true,
+                        visible = showPassword,
+                        onToggleVisibility = { showPassword = !showPassword },
+                        enabled = !busy
+                    )
+                    if (!alreadyBound) {
+                        ProvisionKeyCard(
+                            value = deviceKey,
+                            onValueChange = { deviceKey = it; clearError() },
+                            enabled = !busy
+                        )
+                    }
+                    RememberDeviceRow(checked = rememberDevice, enabled = !busy) { rememberDevice = it }
+                    PrimaryAuthButton(
+                        label = t["login.submit"],
+                        busyLabel = t["login.busy"],
+                        busy = busy,
+                        onClick = {
+                            if (busy) return@PrimaryAuthButton
+                            val name = username.trim()
+                            if (name.isEmpty()) {
+                                fail(t["login.need.username"])
+                                return@PrimaryAuthButton
+                            }
+                            if (password.isEmpty()) {
+                                fail(t["login.need.password"])
+                                return@PrimaryAuthButton
+                            }
+                            val key = deviceKey.trim()
+                            if (!alreadyBound && key.length < 8) {
+                                fail(t["login.need.provision.short"])
+                                return@PrimaryAuthButton
+                            }
+                            busy = true
+                            status = t["login.busy"]
+                            statusError = false
+                            scope.launch {
+                                try {
+                                    val c = client
+                                    c.onThreat = onThreat
+                                    val boot = withContext(Dispatchers.IO) {
+                                        if (alreadyBound) {
+                                            c.authLogin(name, password, "")
+                                        } else {
+                                            c.authLogin(name, password, key)
+                                            c.setRememberAccount(
+                                                if (rememberDevice) name else null,
+                                                if (rememberDevice) password else null
+                                            )
+                                        }
+                                        c.homeBoot()
+                                    }
+                                    applyBootLang(boot)
+                                    busy = false
+                                    onLoggedIn(Session(c, boot))
+                                } catch (e: Exception) {
+                                    fail(errText(e))
+                                }
+                            }
+                        }
+                    )
+                } else {
+                    AuthField(
+                        value = inviteCode,
+                        // Коды на сайте всегда в верхнем регистре — приводим сразу.
+                        onValueChange = { inviteCode = it.uppercase().take(11); clearError() },
+                        label = t["login.invite.label"],
+                        supporting = t["login.invite.hint"],
+                        accent = AzraelCyan,
+                        leading = Icons.Filled.Key,
+                        spaced = true,
+                        enabled = !busy
+                    )
+                    AuthField(
+                        value = username,
+                        onValueChange = { username = it; clearError() },
+                        label = t["login.username"],
+                        accent = AzraelViolet,
+                        leading = Icons.Filled.Person,
+                        enabled = !busy
+                    )
+                    AuthField(
+                        value = displayName,
+                        onValueChange = { displayName = it },
+                        label = t["login.displayName"],
+                        accent = AzraelViolet,
+                        leading = Icons.Filled.Person,
+                        enabled = !busy
+                    )
+                    AuthField(
+                        value = password,
+                        onValueChange = { password = it; clearError() },
+                        label = t["login.password.new"],
+                        accent = AzraelViolet,
+                        leading = Icons.Filled.Key,
+                        isPassword = true,
+                        visible = showPassword,
+                        onToggleVisibility = { showPassword = !showPassword },
+                        enabled = !busy
+                    )
+                    PasswordStrengthMeter(password)
+                    AuthField(
+                        value = password2,
+                        onValueChange = { password2 = it; clearError() },
+                        label = t["login.password.repeat"],
+                        accent = AzraelViolet,
+                        leading = Icons.Filled.Key,
+                        isPassword = true,
+                        visible = showPassword,
+                        onToggleVisibility = { showPassword = !showPassword },
+                        enabled = !busy
+                    )
+                    GenderChips(selected = gender, enabled = !busy) { picked ->
+                        gender = if (gender == picked) "" else picked
+                    }
+                    AvatarPicker(
+                        avatar = avatar,
+                        enabled = !busy,
+                        onPick = {
+                            scope.launch {
+                                val picked = withContext(Dispatchers.IO) {
+                                    pickFile(maxBytes = MAX_AVATAR_BYTES)
+                                }
+                                if (picked == null) {
+                                    status = t["file.picker.unavailable"]
+                                    statusError = true
+                                    return@launch
+                                }
+                                avatar = picked
+                            }
+                        },
+                        onRemove = { avatar = null }
+                    )
+                    PrimaryAuthButton(
+                        label = t["login.submit.register"],
+                        busyLabel = t["login.busy.register"],
+                        busy = busy,
+                        onClick = {
+                            if (busy) return@PrimaryAuthButton
+                            val invite = inviteCode.trim()
+                            if (invite.isEmpty()) {
+                                fail(t["login.need.invite"])
+                                return@PrimaryAuthButton
+                            }
+                            val name = username.trim()
+                            if (name.isEmpty()) {
+                                fail(t["login.need.username"])
+                                return@PrimaryAuthButton
+                            }
+                            if (password.length < 8) {
+                                fail(t["login.password.short"])
+                                return@PrimaryAuthButton
+                            }
+                            if (password != password2) {
+                                fail(t["login.password.mismatch"])
+                                return@PrimaryAuthButton
+                            }
+                            if (gender.isEmpty()) {
+                                fail(t["login.need.gender"])
+                                return@PrimaryAuthButton
+                            }
+                            if (avatar != null && avatar!!.base64.length > MAX_AVATAR_B64) {
+                                fail(t["login.avatar.tooBig"])
+                                return@PrimaryAuthButton
+                            }
+                            busy = true
+                            status = t["login.busy.register"]
+                            statusError = false
+                            val picked = avatar
+                            scope.launch {
+                                try {
+                                    val c = client
+                                    c.onThreat = onThreat
+                                    val boot = withContext(Dispatchers.IO) {
+                                        c.authRegister(
+                                            username = name,
+                                            password = password,
+                                            inviteCode = invite,
+                                            gender = gender,
+                                            avatarData = picked?.let { stripDataUrl(it.base64) },
+                                            avatarMime = picked?.mime
+                                        )
+                                        displayName.trim().ifBlank { null }?.let {
+                                            c.profileUpdate(displayName = it)
+                                        }
+                                        c.setRememberAccount(name, password)
+                                        c.homeBoot()
+                                    }
+                                    applyBootLang(boot)
+                                    busy = false
+                                    onLoggedIn(Session(c, boot))
+                                } catch (e: Exception) {
+                                    fail(errText(e))
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    Icons.Filled.Shield,
+                    contentDescription = null,
+                    tint = AzraelCyan.copy(alpha = 0.5f),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    t["channel.security"],
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.35f),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+/** Логотип-марка над карточкой входа: скруглённый квадрат с градиентом фирменных цветов. */
+@Composable
+private fun BrandMark() {
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(t["app.name"], style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Box(
+            modifier = Modifier
+                .size(62.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Brush.linearGradient(listOf(AzraelViolet, AzraelCyan, AzraelRose)))
+                .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(20.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "A",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                color = Color(0xFF0B0B14)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            t["app.name"],
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.95f),
+            letterSpacing = 3.sp
+        )
+        Spacer(Modifier.height(6.dp))
         Text(
             t["login.intro1"] + t["login.intro2"],
-            style = MaterialTheme.typography.bodyMedium,
-            color = AzraelCyan
-        )
-
-        GlassCard {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Label(t["login.key.label"])
-                OutlinedTextField(
-                    value = keyB64,
-                    onValueChange = onKeyB64,
-                    label = { Text(t["login.key.required"]) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
-                )
-                Label(t["channel.endpoint.value"])
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = onBaseUrl,
-                    label = { Text("https://azrael-lab.xyz/api/app/v1") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
-                )
-            }
-        }
-
-        GlassCard {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Label(t["login.provision.label"])
-                Text(
-                    t["login.provision.site1"] + t["login.provision.site2"] + t["login.access.note"],
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.6f)
-                )
-                OutlinedTextField(
-                    value = deviceKey,
-                    onValueChange = { deviceKey = it },
-                    label = { Text(t["login.provision.name"]) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelCyan)
-                )
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text(t["login.login.label"]) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
-                )
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = rememberDevice,
-                        onCheckedChange = { rememberDevice = it },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = AzraelCyan,
-                            uncheckedColor = Color.White.copy(alpha = 0.5f)
-                        )
-                    )
-                    Text(
-                        t["login.remember"],
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
-                }
-                AccentButton(t["login.submit"]) {
-                    val key = deviceKey.trim()
-                    if (key.length < 8) {
-                        status = t["login.need.provision"]
-                        statusError = true
-                        return@AccentButton
-                    }
-                    if (normalizedEndpoint(baseUrl) == null) {
-                        status = t["channel.endpoint.enter"]
-                        statusError = true
-                        return@AccentButton
-                    }
-                    status = t["login.busy"]
-                    statusError = false
-                    scope.launch {
-                        try {
-                            val client = makeClient(baseUrl, keyB64)
-                            client.onThreat = onThreat
-                            val boot = withContext(Dispatchers.IO) {
-                                client.bindDevice(key)
-                                client.setRememberAccount(if (rememberDevice) username.trim().ifBlank { null } else null, null)
-                                client.homeBoot()
-                            }
-                            applyBootLang(boot)
-                            onLoggedIn(Session(client, boot))
-                        } catch (e: Exception) {
-                            status = errText(e)
-                            statusError = true
-                        }
-                    }
-                }
-                Text(
-                    status,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (statusError) AzraelRose else AzraelCyan
-                )
-            }
-        }
-        Text(
-            t["channel.security"],
             style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.6f)
+            color = Color.White.copy(alpha = 0.42f),
+            textAlign = TextAlign.Center
         )
     }
 }
 
+/** Сегмент-переключатель «Вход / Регистрация» — как на сайте. */
+@Composable
+private fun AuthTabs(selected: AuthTab, enabled: Boolean, onSelect: (AuthTab) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = 0.04f))
+            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        listOf(AuthTab.Login to t["login.tab.login"], AuthTab.Register to t["login.tab.register"])
+            .forEach { (item, label) ->
+                val active = selected == item
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(if (active) Color.White.copy(alpha = 0.15f) else Color.Transparent)
+                        .clickable(enabled = enabled) { onSelect(item) }
+                        .padding(vertical = 11.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        color = if (active) Color.White.copy(alpha = 0.95f) else Color.White.copy(alpha = 0.4f)
+                    )
+                }
+            }
+    }
+}
+
+/** Поле входа: скруглённое «стекло», иконка слева, глаз для пароля, подсказка снизу. */
+@Composable
+private fun AuthField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    accent: Color,
+    leading: ImageVector,
+    modifier: Modifier = Modifier,
+    supporting: String? = null,
+    isPassword: Boolean = false,
+    visible: Boolean = false,
+    onToggleVisibility: (() -> Unit)? = null,
+    spaced: Boolean = false,
+    maxLength: Int? = null,
+    enabled: Boolean = true
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { raw -> onValueChange(if (maxLength == null) raw else raw.take(maxLength)) },
+        label = { Text(label) },
+        singleLine = true,
+        enabled = enabled,
+        shape = RoundedCornerShape(14.dp),
+        visualTransformation = if (isPassword && !visible) {
+            PasswordVisualTransformation()
+        } else {
+            VisualTransformation.None
+        },
+        leadingIcon = {
+            Icon(
+                leading,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.35f),
+                modifier = Modifier.size(18.dp)
+            )
+        },
+        trailingIcon = if (onToggleVisibility == null) {
+            null
+        } else {
+            {
+                IconButton(
+                    onClick = onToggleVisibility,
+                    enabled = enabled,
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        contentDescription = t["login.password.show"],
+                        tint = Color.White.copy(alpha = if (visible) 0.75f else 0.4f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        },
+        supportingText = if (supporting == null) null else {
+            { Text(supporting) }
+        },
+        textStyle = MaterialTheme.typography.bodyLarge.copy(letterSpacing = if (spaced) 2.sp else 0.4.sp),
+        modifier = modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.White.copy(alpha = 0.07f),
+            unfocusedContainerColor = Color.White.copy(alpha = 0.04f),
+            disabledContainerColor = Color.White.copy(alpha = 0.02f),
+            focusedBorderColor = accent.copy(alpha = 0.7f),
+            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+            disabledBorderColor = Color.White.copy(alpha = 0.06f),
+            focusedLabelColor = accent,
+            unfocusedLabelColor = Color.White.copy(alpha = 0.42f),
+            disabledLabelColor = Color.White.copy(alpha = 0.25f),
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White.copy(alpha = 0.9f),
+            disabledTextColor = Color.White.copy(alpha = 0.4f),
+            cursorColor = accent,
+            focusedLeadingIconColor = accent.copy(alpha = 0.9f),
+            unfocusedLeadingIconColor = Color.White.copy(alpha = 0.35f),
+            focusedSupportingTextColor = Color.White.copy(alpha = 0.35f),
+            unfocusedSupportingTextColor = Color.White.copy(alpha = 0.35f)
+        )
+    )
+}
+
+/** Полоса надёжности пароля при регистрации — как PasswordStrength на сайте. */
+@Composable
+private fun PasswordStrengthMeter(password: String) {
+    if (password.isEmpty()) return
+    var score = 0
+    if (password.length >= 8) score++
+    if (password.length >= 12) score++
+    if (password.any { it.isLowerCase() } && password.any { it.isUpperCase() }) score++
+    if (password.any { it.isDigit() }) score++
+    if (password.any { !it.isLetterOrDigit() }) score++
+    val color = when {
+        score < 2 -> Color(0xFFEF4444)
+        score < 3 -> Color(0xFFF59E0B)
+        score < 4 -> Color(0xFF22C55E)
+        else -> Color(0xFF16A34A)
+    }
+    val label = when {
+        score < 2 -> t["login.pw.weak"]
+        score < 3 -> t["login.pw.medium"]
+        score < 4 -> t["login.pw.good"]
+        else -> t["login.pw.strong"]
+    }
+    val width by animateFloatAsState(
+        targetValue = (score / 5f).coerceIn(0.2f, 1f),
+        label = "auth-pw-strength"
+    )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(width)
+                    .height(4.dp)
+                    .background(color, RoundedCornerShape(3.dp))
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = color.copy(alpha = 0.85f),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+/** Чипы выбора пола: свои фирменные цвета вместо буллетов в кнопках. */
+@Composable
+private fun GenderChips(selected: String, enabled: Boolean, onSelect: (String) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Label(t["login.gender"])
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            listOf(
+                Triple("male", t["login.gender.male"], AzraelCyan),
+                Triple("female", t["login.gender.female"], AzraelRose)
+            ).forEach { (value, label, accent) ->
+                val active = selected == value
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (active) accent.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.04f))
+                        .border(
+                            1.dp,
+                            if (active) accent.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable(enabled = enabled) { onSelect(value) }
+                        .padding(vertical = 11.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        color = if (active) accent else Color.White.copy(alpha = 0.45f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Аватар: круг с превью, имя файла и крестик удаления (как на сайте). */
+@Composable
+private fun AvatarPicker(
+    avatar: PickedFile?,
+    enabled: Boolean,
+    onPick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val preview = remember(avatar?.base64) { avatar?.let { avatarBitmap(it.base64) } }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Label(t["login.avatar.pick"])
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White.copy(alpha = 0.04f))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                .clickable(enabled = enabled, onClick = onPick)
+                .padding(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.06f))
+                    .border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (preview != null) {
+                    Image(
+                        bitmap = preview,
+                        contentDescription = t["login.avatar.pick"],
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Person,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    avatar?.name ?: t["login.avatar.hint"],
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = if (avatar == null) 0.45f else 0.85f),
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    if (avatar == null) t["login.avatar.pick"] else t["login.avatar.change"],
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AzraelCyan.copy(alpha = 0.85f)
+                )
+            }
+            if (avatar != null) {
+                IconButton(
+                    onClick = onRemove,
+                    enabled = enabled,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = t["login.avatar.remove"],
+                        tint = AzraelRose.copy(alpha = 0.8f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Блок ключа привязки для первого входа с другого устройства. */
+@Composable
+private fun ProvisionKeyCard(value: String, onValueChange: (String) -> Unit, enabled: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(AzraelCyan.copy(alpha = 0.06f))
+            .border(1.dp, AzraelCyan.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.Key,
+                contentDescription = null,
+                tint = AzraelCyan.copy(alpha = 0.8f),
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                t["login.provision.label"],
+                style = MaterialTheme.typography.labelLarge,
+                color = AzraelCyan.copy(alpha = 0.95f)
+            )
+        }
+        Text(
+            t["login.provision.site1"] + t["login.provision.site2"],
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.5f)
+        )
+        AuthField(
+            value = value,
+            onValueChange = onValueChange,
+            label = t["login.provision.name"],
+            accent = AzraelCyan,
+            leading = Icons.Filled.Key,
+            spaced = true,
+            enabled = enabled
+        )
+    }
+}
+
+/** Чекбокс «Запомнить устройство» — вся строка кликабельна. */
+@Composable
+private fun RememberDeviceRow(checked: Boolean, enabled: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+            colors = CheckboxDefaults.colors(
+                checkedColor = AzraelCyan,
+                uncheckedColor = Color.White.copy(alpha = 0.35f),
+                checkmarkColor = Color(0xFF04212B)
+            )
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            t["login.remember"],
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.8f)
+        )
+    }
+}
+
+/** Статус/ошибка над кнопкой действия — как на сайте (красный текст под полями). */
+@Composable
+private fun StatusBanner(text: String, isError: Boolean) {
+    val accent = if (isError) Color(0xFFF87171) else AzraelCyan
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(accent.copy(alpha = 0.1f))
+            .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Icon(
+            if (isError) Icons.Filled.Warning else Icons.Filled.Info,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.88f)
+        )
+    }
+}
+
+/** Главная кнопка: полная ширина, градиент фирменных цветов, спиннер в состоянии работы. */
+@Composable
+private fun PrimaryAuthButton(label: String, busyLabel: String, busy: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    val fill = if (busy) 0.04f else 0.07f
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .clip(shape)
+            .background(Color.White.copy(alpha = fill))
+            .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
+            .clickable(enabled = !busy, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (busy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+                Spacer(Modifier.width(10.dp))
+            }
+            Text(
+                if (busy) busyLabel else label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = if (busy) 0.45f else 0.88f)
+            )
+        }
+    }
+}
+
+/** Лимит аватара на клиенте: 10 МиБ файла (сервер отвергнет большее). */
+private const val MAX_AVATAR_BYTES = 10L * 1024 * 1024
+
+/** Запас под base64-размер того же файла (4/3) + заполнение, чтобы не упереться в 413. */
+private const val MAX_AVATAR_B64 = 16L * 1024 * 1024
 // ---- Главный экран: повтор /main сайта, табы из home.boot, роли ----
 
 @Composable
@@ -584,10 +1354,6 @@ private fun MainShell(
     session: Session,
     boot: JsonObject,
     bootTick: Int,
-    baseUrl: String,
-    keyB64: String,
-    onBaseUrl: (String) -> Unit,
-    onKeyB64: (String) -> Unit,
     onThreat: (ThreatMode) -> Unit,
     onRefreshBoot: () -> Unit,
     onLogout: () -> Unit,
@@ -650,10 +1416,6 @@ private fun MainShell(
                         tabs = tabs,
                         client = client,
                         profile = profile,
-                        baseUrl = baseUrl,
-                        keyB64 = keyB64,
-                        onBaseUrl = onBaseUrl,
-                        onKeyB64 = onKeyB64,
                         onThreat = onThreat,
                         onRefreshBoot = onRefreshBoot,
                         onLogout = onLogout,
@@ -693,10 +1455,6 @@ private fun MainShell(
                         tabs = tabs,
                         client = client,
                         profile = profile,
-                        baseUrl = baseUrl,
-                        keyB64 = keyB64,
-                        onBaseUrl = onBaseUrl,
-                        onKeyB64 = onKeyB64,
                         onThreat = onThreat,
                         onRefreshBoot = onRefreshBoot,
                         onLogout = onLogout,
@@ -820,10 +1578,6 @@ private fun MainContent(
     tabs: List<Pair<String, String>>,
     client: AppClient,
     profile: AppProfile,
-    baseUrl: String,
-    keyB64: String,
-    onBaseUrl: (String) -> Unit,
-    onKeyB64: (String) -> Unit,
     onThreat: (ThreatMode) -> Unit,
     onRefreshBoot: () -> Unit,
     onLogout: () -> Unit,
@@ -838,8 +1592,6 @@ private fun MainContent(
             "vpn_tab" -> VpnView(client)
             "settings" -> SettingsView(
                 client = client, profile = profile,
-                baseUrl = baseUrl, keyB64 = keyB64,
-                onBaseUrl = onBaseUrl, onKeyB64 = onKeyB64,
                 onThreat = onThreat, onRefreshBoot = onRefreshBoot,
                 onLogout = onLogout, nativeGreeting = nativeGreeting
             )
@@ -1508,6 +2260,12 @@ private fun qrBitmap(dataUrl: String?): ImageBitmap? {
     return decodeImageBase64(raw)
 }
 
+/** Превью выбранного аватара: base64 из pickFile (с data:-префиксом или без). */
+private fun avatarBitmap(base64: String): ImageBitmap? {
+    val raw = stripDataUrl(base64).ifBlank { return null }
+    return decodeImageBase64(raw)
+}
+
 @Composable
 private fun ShortenerView(client: AppClient) {
     var rows by remember { mutableStateOf<List<ShortRow>>(emptyList()) }
@@ -1860,10 +2618,6 @@ private fun VpnView(client: AppClient) {
 private fun SettingsView(
     client: AppClient,
     profile: AppProfile,
-    baseUrl: String,
-    keyB64: String,
-    onBaseUrl: (String) -> Unit,
-    onKeyB64: (String) -> Unit,
     onThreat: (ThreatMode) -> Unit,
     onRefreshBoot: () -> Unit,
     onLogout: () -> Unit,
@@ -2441,42 +3195,19 @@ private fun SettingsView(
         GlassCard {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(t["channel.endpoint.label"], style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = onBaseUrl,
-                    label = { Text("https://…/api/app/v1") },
-                    singleLine = true,
-                    isError = normalizedEndpoint(baseUrl) == null,
-                    supportingText = {
-                        Text(
-                            if (normalizedEndpoint(baseUrl) == null) t["login.need.https"]
-                            else t["channel.endpoint.ok"]
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
+                // Адрес и ключ канала не показываются и не редактируются: ключ приходит
+                // с сервера автоматически (AppVault), пользователь его не знает.
+                Text(
+                    t["channel.key.ready"],
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AzraelCyan
                 )
-                OutlinedTextField(
-                    value = keyB64,
-                    onValueChange = onKeyB64,
-                    label = { Text(t["login.key.label"]) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
-                )
-                AccentButton(t["channel.check.endpoint"]) {
-                    if (normalizedEndpoint(baseUrl) == null) {
-                        status = t["channel.endpoint.need"]
-                        return@AccentButton
-                    }
+                AccentButton(t["channel.check.health"]) {
                     scope.launch {
                         status = "…"
-                        try {
-                            val c = makeClient(baseUrl, keyB64)
-                            c.onThreat = onThreat
-                            val d = withContext(Dispatchers.IO) { c.systemHealth() }
-                            status = t("channel.health.responds", d.toString().take(120))
-                        } catch (e: Exception) { status = errText(e) }
+                        runCatching { withContext(Dispatchers.IO) { client.systemHealth() } }
+                            .onSuccess { status = t("channel.health.responds", it.toString().take(120)) }
+                            .onFailure { status = errText(it) }
                     }
                 }
                 OutlinedTextField(
@@ -2489,9 +3220,6 @@ private fun SettingsView(
                 )
                 AccentButton(t["channel.l2.apply"]) {
                     AppRuntime.srvXPubB64 = l2Pub.trim().ifBlank { null }
-                    AppRuntime.appUrl = normalizedEndpoint(baseUrl)
-                    AppRuntime.appKeyB64 = keyB64.trim().ifBlank { null }
-                    onBaseUrl(normalizedEndpoint(baseUrl) ?: baseUrl)
                     status = t["channel.l2.applied"]
                 }
                 Label(t["profile.autoDelete.hint2"])
@@ -2607,10 +3335,11 @@ private fun Label(text: String) {
 }
 
 @Composable
-private fun AccentButton(label: String, onClick: () -> Unit) {
+private fun AccentButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
+        modifier = modifier,
         colors = ButtonDefaults.buttonColors(
             containerColor = AzraelViolet.copy(alpha = 0.3f),
             contentColor = Color.White

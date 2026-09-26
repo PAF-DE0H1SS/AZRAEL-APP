@@ -58,6 +58,28 @@ if ! command -v objcopy > /dev/null 2>&1; then
   done
 fi
 
+# .deb (jpackage DEB-бандлер) требует fakeroot и dpkg-deb — на NixOS их тоже нет в PATH.
+if [ "$MODE" = "linux" ] || [ "$MODE" = "release" ]; then
+  if ! command -v fakeroot > /dev/null 2>&1; then
+    for d in /nix/store/*fakeroot-*/; do
+      if [ -x "$d/bin/fakeroot" ]; then
+        export PATH="$d/bin:$PATH"
+        echo "[AZRAEL] fakeroot=$d"
+        break
+      fi
+    done
+  fi
+  if ! command -v dpkg-deb > /dev/null 2>&1; then
+    for d in /nix/store/*dpkg-*/; do
+      if [ -x "$d/bin/dpkg-deb" ]; then
+        export PATH="$d/bin:$PATH"
+        echo "[AZRAEL] dpkg=$d"
+        break
+      fi
+    done
+  fi
+fi
+
 echo "[AZRAEL] === Сборка $(date -u +%FT%TZ) / mode=$MODE ==="
 case "$MODE" in
   dev)
@@ -79,11 +101,23 @@ DIST="build/dist"
 mkdir -p "$DIST"
 
 cp app/build/outputs/apk/debug/app-debug.apk "$DIST/AZRAEL-android-debug.apk"
-[ -f app/build/outputs/apk/release/app-release-unsigned.apk ] && \
+# Release: подписанный APK, если доступен signing/keystore.properties, иначе unsigned.
+if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+  cp app/build/outputs/apk/release/app-release.apk "$DIST/AZRAEL-android-release.apk"
+  rm -f "$DIST/AZRAEL-android-release-unsigned.apk"
+  echo "[AZRAEL] release APK подписан (signing/keystore.properties)"
+elif [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
   cp app/build/outputs/apk/release/app-release-unsigned.apk "$DIST/AZRAEL-android-release-unsigned.apk"
+  echo "[AZRAEL] ВНИМАНИЕ: release APK без подписи (нет signing/keystore.properties)"
+fi
 
 DESKTOP_JAR=$(ls desktopApp/build/compose/jars/*.jar 2>/dev/null | head -1 || true)
 [ -n "$DESKTOP_JAR" ] && cp "$DESKTOP_JAR" "$DIST/AZRAEL-desktop-$(uname -m).jar"
+
+# Linux-форматы: .deb — готовый файл; AppImage в Compose 1.12 — каталог app-image
+# (настоящий .AppImage собирает appimagetool в CI, см. .github/workflows/build.yml).
+DEB=$(ls desktopApp/build/compose/binaries/main/deb/*.deb 2>/dev/null | head -1 || true)
+[ -n "$DEB" ] && cp "$DEB" "$DIST/$(basename "$DEB")"
 
 echo "[AZRAEL] === Готово. Артефакты: ==="
 ls -la "$DIST"

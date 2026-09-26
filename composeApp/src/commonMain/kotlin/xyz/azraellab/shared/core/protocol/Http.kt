@@ -14,6 +14,10 @@ object AppRuntime {
 // Платформенный HTTP POST (JSON). Возвращает строку ответа или null при сетевой/HTTP ошибке.
 expect fun httpPostJson(url: String, body: String, timeoutMs: Int = 10_000): String?
 
+// Платформенный HTTP GET (JSON). Нужен для открытой выдачи ключа канала при
+// первом запуске (/api/app/bootstrap) — до того, как ключ у программы ещё есть.
+expect fun httpGetJson(url: String, timeoutMs: Int = 10_000): String?
+
 // Результат HTTP-обмена с заголовками (для защищённого конверта кастомного API).
 data class HttpResult(
     val body: String?,

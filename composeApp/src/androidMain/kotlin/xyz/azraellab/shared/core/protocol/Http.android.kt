@@ -21,6 +21,22 @@ actual fun httpPostJson(url: String, body: String, timeoutMs: Int): String? = tr
     null
 }
 
+// HTTP GET на Android: открытая выдача ключа канала при первом запуске.
+actual fun httpGetJson(url: String, timeoutMs: Int): String? = try {
+    val conn = URL(url).openConnection() as HttpURLConnection
+    conn.requestMethod = "GET"
+    conn.connectTimeout = timeoutMs
+    conn.readTimeout = timeoutMs
+    conn.setRequestProperty("Accept", "application/json")
+    val code = conn.responseCode
+    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+    val text = stream?.use { String(it.readBytes(), Charsets.UTF_8) }.orEmpty()
+    conn.disconnect()
+    if (code in 200..299) text else null
+} catch (e: Exception) {
+    null
+}
+
 // HTTP POST с произвольными заголовками (защищённый конверт кастомного API).
 actual fun httpPostJsonWithHeaders(url: String, body: String, headers: Map<String, String>, timeoutMs: Int): HttpResult = try {
     val conn = URL(url).openConnection() as HttpURLConnection

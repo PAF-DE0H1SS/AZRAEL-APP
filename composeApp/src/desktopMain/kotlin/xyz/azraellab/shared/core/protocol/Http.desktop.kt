@@ -21,6 +21,22 @@ actual fun httpPostJson(url: String, body: String, timeoutMs: Int): String? = tr
     null
 }
 
+// HTTP GET на JVM (desktop): открытая выдача ключа канала при первом запуске.
+actual fun httpGetJson(url: String, timeoutMs: Int): String? = try {
+    val conn = URL(url).openConnection() as HttpURLConnection
+    conn.requestMethod = "GET"
+    conn.connectTimeout = timeoutMs
+    conn.readTimeout = timeoutMs
+    conn.setRequestProperty("Accept", "application/json")
+    val code = conn.responseCode
+    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+    val text = stream?.use { String(it.readBytes(), Charsets.UTF_8) }.orEmpty()
+    conn.disconnect()
+    if (code in 200..299) text else null
+} catch (e: Exception) {
+    null
+}
+
 // HTTP POST с произвольными заголовками (защищённый конверт кастомного API).
 actual fun httpPostJsonWithHeaders(url: String, body: String, headers: Map<String, String>, timeoutMs: Int): HttpResult = try {
     val conn = URL(url).openConnection() as HttpURLConnection
@@ -48,9 +64,12 @@ actual fun httpPostJsonWithHeaders(url: String, body: String, headers: Map<Strin
 actual fun defaultGatewayUrl(): String? =
     AppRuntime.gatewayUrl?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_GATEWAY_URL")?.takeIf { it.isNotBlank() }
 
-// URL кастомного API приложения из AZRAEL_APP_URL.
+// URL кастомного API приложения из AZRAEL_APP_URL; дефолт — как на Android,
+// чтобы адрес не приходилось вводить вручную (в сборку он не секрет).
 actual fun defaultAppUrl(): String? =
-    AppRuntime.appUrl?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_APP_URL")?.takeIf { it.isNotBlank() }
+    AppRuntime.appUrl?.takeIf { it.isNotBlank() }
+        ?: System.getenv("AZRAEL_APP_URL")?.takeIf { it.isNotBlank() }
+        ?: "https://azrael-lab.xyz/api/app/v1"
 
 // Ключ кастомного API приложения из AZRAEL_APP_KEY (base64, как в .env сайта).
 actual fun defaultAppKeyB64(): String? =

@@ -30,14 +30,17 @@ object AppApi {
     // system
     const val SYSTEM_HEALTH = "system.health"
 
-    // device: привязка установки по одноразовому ключу (логинов/паролей на сервере нет)
+    // device: привязка установки по индивидуальному ключу (provision-ключу аккаунта)
     const val DEVICE_BIND = "device.bind"
     const val DEVICE_ROTATE = "device.rotate"
     const val DEVICE_STATUS = "device.status"
     const val DEVICE_LIST = "device.list"
     const val DEVICE_REVOKE = "device.revoke"
 
-    // auth (сессия выдаётся при device.bind; логин/регистрация на сервере отключены)
+    // auth: вход и регистрация по логину/паролю (и зеркально на сайте). Сессия
+    // выдаётся сервером; при регистрации он же выдаёт новый provision-ключ.
+    const val AUTH_LOGIN = "auth.login"
+    const val AUTH_REGISTER = "auth.register"
     const val AUTH_LOGOUT = "auth.logout"
     const val AUTH_VERIFY = "auth.verify"
     const val AUTH_CHANGE_PASSWORD = "auth.changePassword"
@@ -136,8 +139,15 @@ object AppApi {
         AI_CHAT_SEND, AI_CHAT_LIST, GATEWAY_CALL, GATEWAY_HANDSHAKE
     )
 
-    /** Операции без device-подписи: ключа установки ещё нет либо подпись не нужна. */
-    val DEVICE_UNSIGNED_OPS: Set<String> = setOf(DEVICE_BIND, SYSTEM_HEALTH)
+    /**
+     * Операции без device-подписи: ключа установки ещё нет либо подпись не нужна.
+     * Вход/регистрация идут без подписи всегда — иначе вход на новую установку
+     * был бы невозможен, а на уже привязанной подпись сделала бы аккаунт
+     * неразличимым между «кем вошли» и «кем привязана установка».
+     */
+    val DEVICE_UNSIGNED_OPS: Set<String> = setOf(
+        DEVICE_BIND, SYSTEM_HEALTH, AUTH_LOGIN, AUTH_REGISTER
+    )
 }
 
 // Коды ошибок: звучание Gateway-протокола + коды кастомного API.
@@ -312,7 +322,28 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
      * который пользователь видит на сайте (/main → Настройки) ровно один раз.
      * Сервер возвращает session-токен; ключи установки и токен уходят в AppVault.
      */
-    fun bindDevice(provisionKey: String, label: String = platformName().take(32)): JsonObject {
+    fun bindDevice(
+        provisionKey: String,
+        label: String = platformName().take(32),
+        expectedUsername: String? = null
+    ): JsonObject {
+        val data = callBind(provisionKey, label, expectedUsername)
+        persistBinding()
+        return data
+    }
+
+    /**
+     * device.bind без записи состояния: вызывающий сам решает, принять ли привязку.
+     *
+     * [expectedUsername] — логин, под которым открывается форма входа. Сервер
+     * сверяет его с владельцем ключа ДО записи, поэтому ключ чужого аккаунта
+     * не создаёт привязку и не включает анти-угон (заморозку обоих аккаунтов).
+     */
+    private fun callBind(
+        provisionKey: String,
+        label: String = platformName().take(32),
+        expectedUsername: String? = null
+    ): JsonObject {
         val kp = device ?: Crypto.ed25519KeyPair().let {
             val pubB64 = Base64Codec.encode(it.publicKey)
             DeviceKeys(devIdFrom(AppTrap.deviceId(), pubB64), it.privateKey, it.publicKey)
@@ -323,11 +354,110 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
             put("devPub", Base64Codec.encode(kp.pub))
             put("platform", platformName().take(32))
             put("label", label.trim().take(64))
+            expectedUsername?.trim()?.takeIf { it.isNotEmpty() }?.let { put("username", it) }
         }, session = null)
-        device = kp
+        pendingBind = kp
         token = data["token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: token
-        persistState()
         return data
+    }
+
+    /** Ключи установки, принятые привязкой, но ещё не записанные в AppVault. */
+    private var pendingBind: DeviceKeys? = null
+
+    private fun persistBinding() {
+        val kp = pendingBind ?: return
+        device = kp
+        pendingBind = null
+        persistState()
+    }
+
+    private fun str(o: JsonObject, key: String): String =
+        o[key]?.jsonPrimitive?.content?.trim().orEmpty()
+
+    private fun obj(o: JsonObject, key: String): JsonObject =
+        o[key]?.let { runCatching { it.jsonObject }.getOrNull() } ?: JsonObject(emptyMap())
+
+    /**
+     * Регистрация нового аккаунта и привязка установки в один шаг.
+     *
+     * Сервер сам выдаёт новому аккаунту индивидуальный ключ привязки
+     * (provisionKey) — пользователь его не вводит и не видит, программа
+     * привязывается сразу. Возвращает {username, role, lang, uid, new_user}.
+     */
+    fun authRegister(
+        username: String,
+        password: String,
+        inviteCode: String,
+        gender: String,
+        avatarData: String? = null,
+        avatarMime: String? = null
+    ): JsonObject {
+        if (isDeviceBound()) {
+            throw AppException(AppErrorCode.VALIDATION, "device already bound")
+        }
+        val data = call(AppApi.AUTH_REGISTER, buildJsonObject {
+            put("username", username.trim())
+            put("password", password)
+            put("inviteCode", inviteCode.trim())
+            put("gender", gender.trim())
+            avatarData?.let { put("avatarData", it) }
+            avatarMime?.let { put("avatarMime", it) }
+        }, session = null)
+        val prov = str(data, "provisionKey").takeIf { it.isNotBlank() }
+            ?: throw AppException(AppErrorCode.MALFORMED, "provision key missing")
+        // Регистрация создала аккаунт и выдала сессию; привязываем установку его ключом.
+        try {
+            callBind(prov, expectedUsername = username)
+            persistBinding()
+        } catch (e: Throwable) {
+            pendingBind = null
+            throw e
+        }
+        return data
+    }
+
+    /**
+     * Вход по логину/паролю + привязка установки индивидуальным ключом аккаунта.
+     *
+     * Ключ и логин обязаны принадлежать одному аккаунту: сервер при `device.bind`
+     * с чужим ключом заморозил бы оба аккаунта (анти-угон), поэтому логин передаётся
+     * на сервер как ожидаемый владелец ключа, и сверка идёт ДО записи привязки.
+     * Дублируем проверку на клиенте и откатываем временный токен при любой ошибке,
+     * чтобы не остаться с «полувходом» в памяти.
+     */
+    fun authLogin(username: String, password: String, provisionKey: String): JsonObject {
+        val prevToken = token
+        val data = call(AppApi.AUTH_LOGIN, buildJsonObject {
+            put("username", username.trim())
+            put("password", password)
+        }, session = null)
+        val loginName = str(data, "username")
+        token = str(data, "token").takeIf { it.isNotBlank() } ?: prevToken
+
+        try {
+            if (isDeviceBound()) {
+                // Установка уже за аккаунтом: подпись устройства сильнее сессии, поэтому
+                // сначала узнаём, кому она принадлежит, и не даём войти под чужим именем.
+                val boundName = runCatching { str(obj(homeBoot(), "profile"), "username") }
+                    .getOrDefault("")
+                if (boundName.isNotBlank() && loginName.isNotBlank() && !boundName.equals(loginName, true)) {
+                    throw AppException(AppErrorCode.VALIDATION, "device bound to another account")
+                }
+                return data
+            }
+
+            val bound = callBind(provisionKey, expectedUsername = username)
+            val boundName = str(bound, "username")
+            if (boundName.isNotBlank() && loginName.isNotBlank() && !boundName.equals(loginName, true)) {
+                throw AppException(AppErrorCode.VALIDATION, "provision key belongs to another account")
+            }
+            persistBinding()
+            return data
+        } catch (e: Throwable) {
+            token = prevToken
+            pendingBind = null
+            throw e
+        }
     }
 
     /** Текущее состояние привязки на сервере. */

@@ -1,9 +1,30 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
 }
 
+// Подпись release-APK: keystore и пароли лежат в signing/keystore.properties (никогда не коммитятся).
+// Если файла нет — release собирается unsigned (см. build-all.sh), чтобы CI и форки собирались без секретов.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("signing/keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val releaseSigningReady = keystoreProps.getProperty("storeFile") != null
+
 android {
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     namespace = "xyz.azraellab.app"
     compileSdk {
         version = release(37) {
@@ -15,8 +36,8 @@ android {
         applicationId = "xyz.azraellab.app"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         externalNativeBuild {
             cmake {
@@ -27,6 +48,9 @@ android {
 
     buildTypes {
         release {
+            if (releaseSigningReady) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
