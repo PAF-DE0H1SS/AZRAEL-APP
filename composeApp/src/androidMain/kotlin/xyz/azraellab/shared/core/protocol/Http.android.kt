@@ -45,7 +45,15 @@ actual fun httpPostJsonWithHeaders(url: String, body: String, headers: Map<Strin
 }
 
 // На Android URL шлюза задаётся на странице настроек (не хардкодится).
-actual fun defaultGatewayUrl(): String? = null
+actual fun defaultGatewayUrl(): String? = AppRuntime.gatewayUrl?.takeIf { it.isNotBlank() }
 
-// На Android URL API приложения задаётся на странице настроек (не хардкодится).
-actual fun defaultAppUrl(): String? = null
+// На Android адрес API приложения: настройки пользователя, иначе дефолт сборки.
+actual fun defaultAppUrl(): String? =
+    AppRuntime.appUrl?.takeIf { it.isNotBlank() } ?: "https://azrael-lab.xyz/api/app/v1"
+
+// На Android ключ API приложения задаётся в настройках (секрет, в сборку не вшивается).
+actual fun defaultAppKeyB64(): String? = AppRuntime.appKeyB64?.takeIf { it.isNotBlank() }
+
+// Публичный X25519-ключ внутреннего L2-слоя: настройки пользователя, иначе дефолт сборки.
+actual fun defaultAppSrvPubB64(): String? =
+    AppRuntime.srvXPubB64?.takeIf { it.isNotBlank() } ?: "SIfcrfqv9ri+UhTnQnhi7qEHa3sw+9SnbVpJQRvPTlM="

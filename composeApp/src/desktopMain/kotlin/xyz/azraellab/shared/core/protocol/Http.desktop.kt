@@ -45,7 +45,17 @@ actual fun httpPostJsonWithHeaders(url: String, body: String, headers: Map<Strin
 }
 
 // URL шлюза берётся из переменной окружения AZRAEL_GATEWAY_URL (runtime-конфиг вне репозитория).
-actual fun defaultGatewayUrl(): String? = System.getenv("AZRAEL_GATEWAY_URL")?.takeIf { it.isNotBlank() }
+actual fun defaultGatewayUrl(): String? =
+    AppRuntime.gatewayUrl?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_GATEWAY_URL")?.takeIf { it.isNotBlank() }
 
 // URL кастомного API приложения из AZRAEL_APP_URL.
-actual fun defaultAppUrl(): String? = System.getenv("AZRAEL_APP_URL")?.takeIf { it.isNotBlank() }
+actual fun defaultAppUrl(): String? =
+    AppRuntime.appUrl?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_APP_URL")?.takeIf { it.isNotBlank() }
+
+// Ключ кастомного API приложения из AZRAEL_APP_KEY (base64, как в .env сайта).
+actual fun defaultAppKeyB64(): String? =
+    AppRuntime.appKeyB64?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_APP_KEY")?.takeIf { it.isNotBlank() }
+
+// Статичный X25519-ключ внутреннего L2-слоя из AZRAEL_APP_SRV_X_PUB (raw-32 base64).
+actual fun defaultAppSrvPubB64(): String? =
+    AppRuntime.srvXPubB64?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_APP_SRV_X_PUB")?.takeIf { it.isNotBlank() }

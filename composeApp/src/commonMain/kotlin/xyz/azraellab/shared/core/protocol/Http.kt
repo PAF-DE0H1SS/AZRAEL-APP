@@ -1,5 +1,16 @@
 package xyz.azraellab.shared.core.protocol
 
+/**
+ * Значения конфигурации, заданные пользователем в настроеках приложения.
+ * Имеют приоритет над платформенными умолчаниями (env на десктопе, дефолты сборки на Android).
+ */
+object AppRuntime {
+    var gatewayUrl: String? = null
+    var appUrl: String? = null
+    var appKeyB64: String? = null
+    var srvXPubB64: String? = null
+}
+
 // Платформенный HTTP POST (JSON). Возвращает строку ответа или null при сетевой/HTTP ошибке.
 expect fun httpPostJson(url: String, body: String, timeoutMs: Int = 10_000): String?
 
@@ -18,3 +29,12 @@ expect fun defaultGatewayUrl(): String?
 
 // Базовый URL кастомного API приложения (/api/app/v1) из runtime-конфига.
 expect fun defaultAppUrl(): String?
+
+// Ключ кастомного API (/api/app/v1) из runtime-конфига в base64 (desktop: AZRAEL_APP_KEY;
+// android: задаётся в настройках приложения). null — канал без шифрования (только подтверждение).
+expect fun defaultAppKeyB64(): String?
+
+// Статичный X25519-ключ (raw-32 base64) внутреннего L2-слоя (сайт НЕ расшифровывает L2 —
+// ключ _SRV_X_PUB принадлежит внутреннему роуту /v2/l2). Desktop: AZRAEL_APP_SRV_X_PUB;
+// android: задаётся в настройках приложения.
+expect fun defaultAppSrvPubB64(): String?
