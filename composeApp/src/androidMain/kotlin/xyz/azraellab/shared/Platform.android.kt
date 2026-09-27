@@ -1,15 +1,83 @@
 package xyz.azraellab.shared
 
+import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
+import android.provider.OpenableColumns
 import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import java.io.ByteArrayOutputStream
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 actual fun platformName(): String = "Android"
 
-actual fun pickFile(maxBytes: Long): PickedFile? = null
+/**
+ * Выбор файла через системный диалог (Storage Access Framework). Раньше здесь был
+ * stub `= null`, из-за чего на Android не работали ни аватар, ни вложение в чат.
+ * GetContent отдаёт временный доступ к содержимому — хватает прочитать файл сразу,
+ * persistable-разрешение не нужно.
+ */
+@Composable
+actual fun rememberFilePicker(
+    mimeTypes: List<String>,
+    maxBytes: Long,
+    onResult: (FilePick) -> Unit
+): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val callback = rememberUpdatedState(onResult)
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) {
+            callback.value(FilePick.Cancelled)
+        } else {
+            scope.launch {
+                callback.value(withContext(Dispatchers.IO) { readPickedFile(context, uri, maxBytes) })
+            }
+        }
+    }
+    val filter = mimeTypes.firstOrNull { it.isNotBlank() } ?: "*/*"
+    return { launcher.launch(filter) }
+}
+
+private fun readPickedFile(context: Context, uri: Uri, maxBytes: Long): FilePick {
+    val resolver = context.contentResolver
+    val mime = runCatching { resolver.getType(uri) }.getOrNull() ?: "application/octet-stream"
+    val name = runCatching {
+        resolver.query(uri, null, null, null, null)?.use { c ->
+            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
+        }
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment?.substringAfterLast('/') ?: "file"
+    val bytes = runCatching {
+        resolver.openInputStream(uri)?.use { input ->
+            val out = ByteArrayOutputStream()
+            val buf = ByteArray(32 * 1024)
+            var total = 0L
+            while (true) {
+                val n = input.read(buf)
+                if (n <= 0) break
+                total += n
+                // Обрываем раньше, чем файл целиком ляжет в память.
+                if (total > maxBytes) return FilePick.Unavailable
+                out.write(buf, 0, n)
+            }
+            out.toByteArray()
+        }
+    }.getOrNull()
+    if (bytes == null || bytes.isEmpty()) return FilePick.Unavailable
+    return FilePick.Picked(PickedFile(name, mime, Base64.encodeToString(bytes, Base64.NO_WRAP)))
+}
 
 actual fun decodeImageBase64(data: String): ImageBitmap? {
     val raw = stripDataUrl(data)

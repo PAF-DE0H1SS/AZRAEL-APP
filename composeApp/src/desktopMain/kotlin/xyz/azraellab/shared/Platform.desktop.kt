@@ -1,5 +1,8 @@
 package xyz.azraellab.shared
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.awt.Toolkit
@@ -10,19 +13,38 @@ import java.nio.file.Path
 import java.util.Base64
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 
 actual fun platformName(): String = "Desktop (JVM)"
 
-actual fun pickFile(maxBytes: Long): PickedFile? {
+@Composable
+actual fun rememberFilePicker(
+    mimeTypes: List<String>,
+    maxBytes: Long,
+    onResult: (FilePick) -> Unit
+): () -> Unit {
+    val scope = rememberCoroutineScope()
+    val callback = rememberUpdatedState(onResult)
+    return {
+        scope.launch {
+            // JFileChooser блокирующий и не любит EDT — читаем файл в отдельном потоке.
+            callback.value(withContext(Dispatchers.IO) { showOpenDialog(maxBytes) })
+        }
+    }
+}
+
+private fun showOpenDialog(maxBytes: Long): FilePick {
     val chooser = JFileChooser()
     chooser.isMultiSelectionEnabled = false
     chooser.isAcceptAllFileFilterUsed = true
     chooser.fileFilter = FileNameExtensionFilter("Изображения, текст, документы", "png", "jpg", "jpeg", "gif", "webp", "bmp", "txt", "md", "pdf", "json", "zip")
-    if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return null
-    val file = chooser.selectedFile ?: return null
-    if (!file.isFile || file.length() > maxBytes) return null
-    return PickedFile(file.name, mimeByName(file.name), Base64.getEncoder().encodeToString(file.readBytes()))
+    if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return FilePick.Cancelled
+    val file = chooser.selectedFile ?: return FilePick.Cancelled
+    if (!file.isFile || file.length() > maxBytes) return FilePick.Unavailable
+    return FilePick.Picked(PickedFile(file.name, mimeByName(file.name), Base64.getEncoder().encodeToString(file.readBytes())))
 }
 
 actual fun decodeImageBase64(data: String): ImageBitmap? {

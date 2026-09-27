@@ -1,5 +1,6 @@
 package xyz.azraellab.shared
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
 import xyz.azraellab.shared.core.crypto.Crypto
 
@@ -8,8 +9,30 @@ expect fun platformName(): String
 /** Выбранный пользователем файл (для вложений и аватара). */
 data class PickedFile(val name: String, val mime: String, val base64: String)
 
-/** Диалог выбора файла. null — отмена или платформа без файлового диалога. */
-expect fun pickFile(maxBytes: Long = 20L * 1024 * 1024): PickedFile?
+/** Итог системного диалога выбора файла. */
+sealed interface FilePick {
+    /** Файл выбран и прочитан. */
+    data class Picked(val file: PickedFile) : FilePick
+
+    /** Пользователь закрыл диалог — это не ошибка, сообщать не о чем. */
+    data object Cancelled : FilePick
+
+    /** Диалога на платформе нет либо файл не прочитался (битый, больше maxBytes). */
+    data object Unavailable : FilePick
+}
+
+/**
+ * Системный диалог выбора файла. Возвращает запускатор, который нужно вызвать
+ * из обработчика клика; mimeTypes — фильтр (для аватара «image/» + звёздочка, для
+ * вложений «*» + /«*» — любой файл), maxBytes — лимит размера. Сам диалог открывается
+ * системой, чтение файла — в IO, результат приходит в onResult в главном потоке.
+ */
+@Composable
+expect fun rememberFilePicker(
+    mimeTypes: List<String>,
+    maxBytes: Long,
+    onResult: (FilePick) -> Unit
+): () -> Unit
 
 /** Декод base64-картинки (data:image/png;base64,…) в ImageBitmap; null при ошибке. */
 expect fun decodeImageBase64(data: String): ImageBitmap?

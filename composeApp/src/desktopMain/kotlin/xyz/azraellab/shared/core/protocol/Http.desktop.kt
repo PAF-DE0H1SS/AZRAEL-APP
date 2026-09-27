@@ -3,12 +3,24 @@ package xyz.azraellab.shared.core.protocol
 import java.net.HttpURLConnection
 import java.net.URL
 
+/**
+ * Соединение без keep-alive: HttpURLConnection переиспользует сокет из пула, но
+ * Cloudflare/HTTP2 закрывает его сам, и следующий запрос уходит в уже мёртвый сокет —
+ * запись проходит «в никуда», а чтение висит до readTimeout (20 с) и выглядит как
+ * «network: no response». Каждый запрос канала — отдельный подписанный конверт, выигрыша
+ * от keep-alive здесь нет, поэтому соединение закрываем явно.
+ */
+private fun openOnce(url: String, timeoutMs: Int): HttpURLConnection =
+    (URL(url).openConnection() as HttpURLConnection).apply {
+        connectTimeout = timeoutMs
+        readTimeout = timeoutMs
+        setRequestProperty("Connection", "close")
+    }
+
 // HTTP POST на JVM (desktop): стандартный HttpURLConnection, ответ читается как UTF-8.
 actual fun httpPostJson(url: String, body: String, timeoutMs: Int): String? = try {
-    val conn = URL(url).openConnection() as HttpURLConnection
+    val conn = openOnce(url, timeoutMs)
     conn.requestMethod = "POST"
-    conn.connectTimeout = timeoutMs
-    conn.readTimeout = timeoutMs
     conn.setRequestProperty("Content-Type", "application/json")
     conn.doOutput = true
     conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
@@ -23,10 +35,8 @@ actual fun httpPostJson(url: String, body: String, timeoutMs: Int): String? = tr
 
 // HTTP GET на JVM (desktop): открытая выдача ключа канала при первом запуске.
 actual fun httpGetJson(url: String, timeoutMs: Int): String? = try {
-    val conn = URL(url).openConnection() as HttpURLConnection
+    val conn = openOnce(url, timeoutMs)
     conn.requestMethod = "GET"
-    conn.connectTimeout = timeoutMs
-    conn.readTimeout = timeoutMs
     conn.setRequestProperty("Accept", "application/json")
     val code = conn.responseCode
     val stream = if (code in 200..299) conn.inputStream else conn.errorStream
@@ -39,10 +49,8 @@ actual fun httpGetJson(url: String, timeoutMs: Int): String? = try {
 
 // HTTP POST с произвольными заголовками (защищённый конверт кастомного API).
 actual fun httpPostJsonWithHeaders(url: String, body: String, headers: Map<String, String>, timeoutMs: Int): HttpResult = try {
-    val conn = URL(url).openConnection() as HttpURLConnection
+    val conn = openOnce(url, timeoutMs)
     conn.requestMethod = "POST"
-    conn.connectTimeout = timeoutMs
-    conn.readTimeout = timeoutMs
     conn.setRequestProperty("Content-Type", "application/json")
     headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
     conn.doOutput = true

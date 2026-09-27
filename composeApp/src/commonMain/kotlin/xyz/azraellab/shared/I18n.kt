@@ -310,7 +310,7 @@ private val RU = mapOf(
     "error.invite" to "Неверный или использованный инвайт-код",
     "error.validation" to "Ошибка заполнения",
     "error.deviceLimit" to "Лимит устройств достигнут",
-    "file.picker.unavailable" to "Выбор файла недоступен на этой платформе",
+    "file.picker.unavailable" to "Не удалось взять файл: он слишком большой или не читается",
 )
 
 private val EN = mapOf(
@@ -552,7 +552,7 @@ private val EN = mapOf(
     "error.invite" to "Wrong or already used invite code",
     "error.validation" to "Validation error",
     "error.deviceLimit" to "Device limit reached",
-    "file.picker.unavailable" to "File picking is not available on this platform",
+    "file.picker.unavailable" to "Could not take the file: it is too large or unreadable",
 )
 
 private val ZH = mapOf(
@@ -794,7 +794,7 @@ private val ZH = mapOf(
     "error.invite" to "邀请码错误或已被使用",
     "error.validation" to "填写有误",
     "error.deviceLimit" to "已达到设备数量上限",
-    "file.picker.unavailable" to "此平台不支持选择文件",
+    "file.picker.unavailable" to "无法获取文件：文件过大或无法读取",
 )
 
 // ---- Чаты и сообщения ----

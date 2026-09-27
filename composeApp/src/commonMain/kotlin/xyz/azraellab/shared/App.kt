@@ -572,6 +572,27 @@ private fun LoginScreen(
     var busy by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    fun clearError() {
+        if (statusError) {
+            status = ""
+            statusError = false
+        }
+    }
+
+    val pickAvatar = rememberFilePicker(listOf("image/*"), MAX_AVATAR_BYTES) { res ->
+        when (res) {
+            is FilePick.Picked -> {
+                avatar = res.file
+                clearError()
+            }
+            FilePick.Cancelled -> Unit
+            FilePick.Unavailable -> {
+                status = t["file.picker.unavailable"]
+                statusError = true
+            }
+        }
+    }
+
     // Уже привязанная установка: вход по логину/паролю без ключа привязки —
     // подпись устройства уже подтверждена, ключ выдавать не нужно.
     val alreadyBound = remember { client.isDeviceBound() }
@@ -580,13 +601,6 @@ private fun LoginScreen(
         status = message
         statusError = true
         busy = false
-    }
-
-    fun clearError() {
-        if (statusError) {
-            status = ""
-            statusError = false
-        }
     }
 
     fun switchTab(next: AuthTab) {
@@ -770,19 +784,7 @@ private fun LoginScreen(
                     AvatarPicker(
                         avatar = avatar,
                         enabled = !busy,
-                        onPick = {
-                            scope.launch {
-                                val picked = withContext(Dispatchers.IO) {
-                                    pickFile(maxBytes = MAX_AVATAR_BYTES)
-                                }
-                                if (picked == null) {
-                                    status = t["file.picker.unavailable"]
-                                    statusError = true
-                                    return@launch
-                                }
-                                avatar = picked
-                            }
-                        },
+                        onPick = pickAvatar,
                         onRemove = { avatar = null }
                     )
                     PrimaryAuthButton(
@@ -2114,25 +2116,28 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                             }
                         }
                     }
-                    AccentButton(t["chats.attach"]) {
-                        scope.launch {
-                            val picked = withContext(Dispatchers.IO) { pickFile() }
-                            if (picked == null) {
-                                status = t["file.picker.unavailable"]
-                                return@launch
-                            }
-                            status = t("file.uploadBusy", picked.name)
-                            try {
-                                val d = withContext(Dispatchers.IO) {
-                                    client.chatsFileUpload(picked.base64, picked.mime, picked.name)
+                    val pickAttach = rememberFilePicker(listOf("*/*"), 20L * 1024 * 1024) { res ->
+                        when (res) {
+                            is FilePick.Picked -> {
+                                val picked = res.file
+                                scope.launch {
+                                    status = t("file.uploadBusy", picked.name)
+                                    try {
+                                        val d = withContext(Dispatchers.IO) {
+                                            client.chatsFileUpload(picked.base64, picked.mime, picked.name)
+                                        }
+                                        pendingFile = (d.s("fileToken") ?: "") to picked.name
+                                        status = t["chats.fileReady"]
+                                    } catch (e: Exception) {
+                                        status = errText(e)
+                                    }
                                 }
-                                pendingFile = (d.s("fileToken") ?: "") to picked.name
-                                status = t["chats.fileReady"]
-                            } catch (e: Exception) {
-                                status = errText(e)
                             }
+                            FilePick.Cancelled -> Unit
+                            FilePick.Unavailable -> status = t["file.picker.unavailable"]
                         }
                     }
+                    AccentButton(t["chats.attach"]) { pickAttach() }
                 }
             }
         }
@@ -2810,23 +2815,26 @@ private fun SettingsView(
                 if (avatarUrl.isNotBlank()) {
                     Label(t("profile.avatar.info", avatarUrl))
                 }
-                AccentButton(t["profile.avatar.upload"]) {
-                    scope.launch {
-                        val picked = withContext(Dispatchers.IO) { pickFile(maxBytes = 5L * 1024 * 1024) }
-                        if (picked == null) {
-                            status = t["file.picker.unavailable"]
-                            return@launch
-                        }
-                        status = t["profile.avatar.busy"]
-                        try {
-                            withContext(Dispatchers.IO) {
-                                client.profileAvatarSet(stripDataUrl(picked.base64), picked.mime)
+                val pickAvatarUpload = rememberFilePicker(listOf("image/*"), 5L * 1024 * 1024) { res ->
+                    when (res) {
+                        is FilePick.Picked -> {
+                            val picked = res.file
+                            scope.launch {
+                                status = t["profile.avatar.busy"]
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        client.profileAvatarSet(stripDataUrl(picked.base64), picked.mime)
+                                    }
+                                    avatarUrl = withContext(Dispatchers.IO) { client.profileAvatarUrl() }.s("url") ?: avatarUrl
+                                    status = t["profile.avatar.updated"]
+                                } catch (e: Exception) { status = errText(e) }
                             }
-                            avatarUrl = withContext(Dispatchers.IO) { client.profileAvatarUrl() }.s("url") ?: avatarUrl
-                            status = t["profile.avatar.updated"]
-                        } catch (e: Exception) { status = errText(e) }
+                        }
+                        FilePick.Cancelled -> Unit
+                        FilePick.Unavailable -> status = t["file.picker.unavailable"]
                     }
                 }
+                AccentButton(t["profile.avatar.upload"]) { pickAvatarUpload() }
             }
         }
 
