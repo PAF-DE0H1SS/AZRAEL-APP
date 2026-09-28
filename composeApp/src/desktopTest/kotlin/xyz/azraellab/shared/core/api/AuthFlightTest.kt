@@ -20,7 +20,9 @@ import kotlin.test.assertTrue
  * не задан вовсе — тест тихо пропускается, чтобы CI без сети оставался зелёным.
  *
  * Сценарий:
- *  - ключ канала берётся с открытой точки /api/app/bootstrap (его не вводит пользователь);
+ *  - ключ канала берётся с открытой точки /api/app/bootstrap?devId=… (его не вводит пользователь);
+ *    devId выводится сервером в per-install ключ, поэтому клиент создаёт ключи установки
+ *    до первого запроса;
  *  - с этим ключом клиент работает в защищённом режиме (isSecure);
  *  - auth.login с неверным паролем отклоняется кодом 201;
  *  - auth.register с несуществующим инвайт-кодом отклоняется кодом 203, аккаунт не создан;
@@ -47,19 +49,26 @@ class AuthFlightTest {
     /**
      * Клиент с реально полученным ключом и изолированным хранилищем;
      * null — сервер недоступен, тест пропускается. Хранилище удаляется после теста.
+     *
+     * devId создаётся ДО запроса ключа: сервер выдаёт ключ, выведенный из devId этой
+     * установки, и без него ответа не будет. Vault подменяется первым, иначе тест
+     * создал бы ключи в настоящем хранилище разработчика.
      */
-    private fun liveClient(): AppClient? {
+    private fun liveClientAndKey(): Pair<AppClient, ByteArray>? {
         val url = apiUrl()
-        val key = AppKeyBootstrap.fetch(url) ?: run {
-            println("[flight] $url недоступен — тест пропускается")
-            return null
-        }
         val home = Files.createTempDirectory("azrael-flight")
         if (originalHome == null) originalHome = System.getProperty("user.home")
         System.setProperty("user.home", home.toString())
         homes.add(home)
-        return AppClient(url, key)
+        val devId = AppInstall.ensureDeviceKeys()
+        val key = AppKeyBootstrap.fetch(url, devId) ?: run {
+            println("[flight] $url недоступен — тест пропускается")
+            return null
+        }
+        return AppClient(url, key) to key
     }
+
+    private fun liveClient(): AppClient? = liveClientAndKey()?.first
 
     @AfterTest
     fun cleanupVaults() {
@@ -84,14 +93,23 @@ class AuthFlightTest {
 
     @Test
     fun bootstrapKeyIsFetchedAndUsedForSecureChannel() {
-        val url = apiUrl()
-        val key = AppKeyBootstrap.fetch(url) ?: run {
-            println("[flight] $url недоступен — тест пропущен")
-            return
-        }
+        val (client, key) = liveClientAndKey() ?: return
         assertEquals(32, key.size, "ключ канала должен быть 32 байта (AES-256)")
-        assertTrue(AppKeyBootstrap.bootstrapUrl(url).endsWith("/api/app/bootstrap"))
-        assertTrue(AppClient(url, key).isSecure, "клиент с bootstrap-ключом обязан быть в защищённом режиме")
+        val devId = client.deviceId()
+        assertNotNull(devId, "ключи установки должны существовать до запроса ключа канала")
+        assertTrue(
+            AppKeyBootstrap.bootstrapUrl(apiUrl(), devId!!).endsWith("?devId=$devId"),
+            "в адресе выдачи ключа должен быть devId установки"
+        )
+        assertTrue(client.isSecure, "клиент с bootstrap-ключом обязан быть в защищённом режиме")
+
+        // Настоящий запрос по каналу. Он проходит только если совпали ВСЕ четыре
+        // вещи: клиентская формула per-install ключа, заголовок x-azrael-kid,
+        // конверт запроса и проверка подписи ответа. Раньше тест тут останавливался,
+        // поэтому рассинхрон клиента и сервера оставался незамеченным.
+        val health = client.systemHealth()
+        assertNotNull(health["ok"] ?: health["status"] ?: health["v"],
+            "ответ system.health должен быть непустым объектом: $health")
     }
 
     @Test

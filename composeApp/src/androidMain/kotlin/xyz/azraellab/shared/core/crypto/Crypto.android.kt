@@ -4,7 +4,7 @@ import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.security.Signature
+import java.security.Security
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.XECPublicKeySpec
 import javax.crypto.Cipher
@@ -22,15 +22,12 @@ actual object Crypto {
     private val PKCS8_X25519 = byteArrayOf(
         0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x03, 0x22, 0x04, 0x20
     )
-    private val PKCS8_ED25519 = byteArrayOf(
-        0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20
-    )
     private val SPKI_X25519 = byteArrayOf(
         0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x03, 0x21, 0x00
     )
-    private val SPKI_ED25519 = byteArrayOf(
-        0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00
-    )
+
+    /** Порядок провайдеров фиксирован, чтобы выбор не зависел от Security.getProviders(). */
+    private val preferredProviders = listOf("AndroidOpenSSL", "Conscrypt")
 
     // X25519 кодирует координату little-endian; JCA BigInteger ждёт big-endian,
     // поэтому raw-32 (RFC 7748) разворачиваем перед BigInteger (проверено E2E vs Node).
@@ -39,8 +36,30 @@ actual object Crypto {
         java.math.BigInteger(1, pub.reversedArray())
     )
 
+    /**
+     * Генератор пары ключей мимо AndroidKeyStore.
+     *
+     * `KeyPairGenerator.getInstance("Ed25519")` на Android разрешается в
+     * AndroidKeyStore, а тот на программную генерацию отвечает
+     * `IllegalStateException: Not initialized` — он умеет только аппаратные ключи.
+     * Нам же нужен обычный ключ JCA: сырые 32 байта приватного ключа лежат в
+     * vault установки и участвуют в подписи запросов, hardware-объект туда не
+     * положить. Поэтому KeyStore-провайдеры отбрасываются, а генерация идёт
+     * через BoringSSL/Conscrypt в фиксированном порядке.
+     */
+    private fun keyPairGenerator(algorithm: String): KeyPairGenerator {
+        val usable = Security.getProviders().map { it.name }
+            .filterNot { it.contains("KeyStore", ignoreCase = true) }
+        val order = preferredProviders.filter { it in usable } +
+            usable.filterNot { it in preferredProviders }
+        for (name in order) {
+            runCatching { KeyPairGenerator.getInstance(algorithm, name) }.getOrNull()?.let { return it }
+        }
+        return KeyPairGenerator.getInstance(algorithm)
+    }
+
     actual fun keyPair(seed: ByteArray?): KeyPairData {
-        val kpg = KeyPairGenerator.getInstance("X25519")
+        val kpg = keyPairGenerator("X25519")
         val kp = kpg.generateKeyPair()
         val priv = kp.private.encoded ?: ByteArray(32).also { rnd.nextBytes(it) }
         val pub = kp.public.encoded ?: ByteArray(32)
@@ -59,7 +78,7 @@ actual object Crypto {
     }
 
     actual fun x25519KeyPairRaw(seed: ByteArray?): KeyPairData {
-        val kpg = KeyPairGenerator.getInstance("X25519")
+        val kpg = keyPairGenerator("X25519")
         val kp = kpg.generateKeyPair()
         return KeyPairData(
             publicKey = stripPrefix(kp.public.encoded, SPKI_X25519),
@@ -78,22 +97,12 @@ actual object Crypto {
     }
 
     actual fun ed25519KeyPair(seed: ByteArray?): KeyPairData {
-        val kpg = KeyPairGenerator.getInstance("Ed25519")
-        val kp = kpg.generateKeyPair()
-        return KeyPairData(
-            publicKey = stripPrefix(kp.public.encoded, SPKI_ED25519),
-            privateKey = stripPrefix(kp.private.encoded, PKCS8_ED25519)
-        )
+        val s = seed ?: ByteArray(32).also { rnd.nextBytes(it) }
+        return KeyPairData(publicKey = Ed25519.publicKeyFromSeed(s), privateKey = s.copyOf())
     }
 
-    actual fun ed25519Sign(privKey: ByteArray, message: ByteArray): ByteArray {
-        val kf = KeyFactory.getInstance("Ed25519")
-        val priv = kf.generatePrivate(PKCS8EncodedKeySpec(concatBytes(PKCS8_ED25519, privKey)))
-        val sig = Signature.getInstance("Ed25519")
-        sig.initSign(priv)
-        sig.update(message)
-        return sig.sign()
-    }
+    actual fun ed25519Sign(privKey: ByteArray, message: ByteArray): ByteArray =
+        Ed25519.sign(privKey, message)
 
     actual fun hkdfSha256(ikm: ByteArray, salt: ByteArray, info: ByteArray, length: Int): ByteArray = try {
         val s = if (salt.size >= 32) salt else ByteArray(32).also { salt.copyInto(it) }
@@ -144,6 +153,8 @@ actual object Crypto {
     }
 
     actual fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
+
+    actual fun randomBytes(size: Int): ByteArray = ByteArray(size).also { rnd.nextBytes(it) }
 
     private fun stripPrefix(encoded: ByteArray, prefix: ByteArray): ByteArray {
         if (encoded.size == 32) return encoded

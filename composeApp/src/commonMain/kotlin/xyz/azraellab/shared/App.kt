@@ -111,6 +111,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import xyz.azraellab.shared.core.api.AppClient
+import xyz.azraellab.shared.core.api.AppInstall
 import xyz.azraellab.shared.core.api.AppErrorCode
 import xyz.azraellab.shared.core.api.AppException
 import xyz.azraellab.shared.core.api.AppKeyBootstrap
@@ -123,10 +124,12 @@ import xyz.azraellab.shared.core.protocol.GatewayClient
 import xyz.azraellab.shared.core.protocol.defaultAppSrvPubB64
 import xyz.azraellab.shared.core.protocol.defaultAppUrl
 import xyz.azraellab.shared.core.protocol.defaultGatewayUrl
-import xyz.azraellab.shared.ui.AzraelCyan
-import xyz.azraellab.shared.ui.AzraelRose
+import xyz.azraellab.shared.ui.AzraelSecondary
+import xyz.azraellab.shared.ui.AzraelDanger
 import xyz.azraellab.shared.ui.AzraelTheme
-import xyz.azraellab.shared.ui.AzraelViolet
+import xyz.azraellab.shared.ui.AzraelOnPrimary
+import xyz.azraellab.shared.ui.AzraelPrimary
+import xyz.azraellab.shared.ui.AzraelTextDim
 import xyz.azraellab.shared.ui.GlassBackground
 import xyz.azraellab.shared.ui.glass
 
@@ -230,11 +233,11 @@ private fun parseTabs(cfg: JsonObject?): List<Pair<String, String>> {
 }
 
 private fun roleColor(role: String): Color = when (role) {
-    "owner" -> AzraelRose
-    "admin" -> AzraelViolet
+    "owner" -> AzraelDanger
+    "admin" -> AzraelPrimary
     "rf" -> Color(0xFFFFB74D)
     "premium" -> Color(0xFFE6C86A)
-    else -> AzraelCyan
+    else -> AzraelSecondary
 }
 
 /**
@@ -295,7 +298,11 @@ private sealed interface ChannelKey {
 
 /**
  * Ключ канала для адреса API: из AppVault, иначе одноразовый запрос
- * `GET /api/app/bootstrap`. Адрес и ключ не вводятся и не показываются.
+ * `GET /api/app/bootstrap?devId=…`. Адрес и ключ не вводятся и не показываются.
+ *
+ * Сервер отдаёт ключ, выведенный из devId этой установки, поэтому ключи установок
+ * не совпадают, а общий мастер-ключ не покидает сервер. devId берётся из ключей
+ * установки, которые создаются при первом запуске и не меняются при ротации.
  *
  * Возвращает состояние и повтор: [ChannelScreen] не может сменить состояние сам,
  * поэтому «Повторить» поднимает счётчик попыток и перезапускает LaunchedEffect.
@@ -309,10 +316,19 @@ private fun rememberChannelKey(baseUrl: String): Pair<ChannelKey, () -> Unit> {
         // Сеть/файл могут бросить исключение — тогда это такой же провал, как пустой ответ.
         val keyB64 = withContext(Dispatchers.IO) {
             runCatching {
+                val devId = AppInstall.ensureDeviceKeys()
+                // Ключ канала выдаётся под конкретную установку, поэтому кэш годен
+                // только для того же devId. Файл, записанный старой версией
+                // программы, маркера не содержит — значит это прежний общий ключ,
+                // который сервер больше не принимает: такой кэш не переиспользуем.
                 val cached = AppVault.readAppKey()
-                if (!cached.isNullOrBlank()) cached
-                else AppKeyBootstrap.fetch(baseUrl)?.let { fresh ->
-                    Base64Codec.encode(fresh).also { AppVault.writeAppKey(it) }
+                val cachedForUs = cached?.takeIf { AppVault.readAppKeyDevId() == devId }
+                if (cachedForUs != null) {
+                    cachedForUs
+                } else {
+                    AppKeyBootstrap.fetch(baseUrl, devId)?.let { fresh ->
+                        Base64Codec.encode(fresh).also { AppVault.writeAppKey(devId, it) }
+                    }
                 }
             }.getOrNull()
         }
@@ -429,7 +445,7 @@ private fun ProtectionScreen(
         Text(
             "⛔",
             style = MaterialTheme.typography.displayLarge,
-            color = AzraelRose
+            color = AzraelDanger
         )
         Spacer(Modifier.height(16.dp))
         Text(
@@ -481,7 +497,7 @@ private fun ProtectionScreen(
             Text(
                 probe,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (probe.startsWith(t["protection.released.short"])) AzraelCyan else AzraelRose,
+                color = if (probe.startsWith(t["protection.released.short"])) AzraelSecondary else AzraelDanger,
                 textAlign = TextAlign.Center
             )
         }
@@ -506,7 +522,7 @@ private fun ChannelScreen(channel: ChannelKey, onRetry: () -> Unit) {
         )
         Spacer(Modifier.height(14.dp))
         if (failed == null) {
-            CircularProgressIndicator(color = AzraelCyan)
+            CircularProgressIndicator(color = AzraelSecondary)
             Spacer(Modifier.height(14.dp))
             Text(
                 t["channel.key.loading"],
@@ -514,12 +530,12 @@ private fun ChannelScreen(channel: ChannelKey, onRetry: () -> Unit) {
                 color = Color.White
             )
         } else {
-            Icon(Icons.Filled.Block, contentDescription = null, tint = AzraelRose, modifier = Modifier.height(44.dp))
+            Icon(Icons.Filled.Block, contentDescription = null, tint = AzraelDanger, modifier = Modifier.height(44.dp))
             Spacer(Modifier.height(10.dp))
             Text(
                 failed.reason,
                 style = MaterialTheme.typography.bodyLarge,
-                color = AzraelRose,
+                color = AzraelDanger,
                 textAlign = TextAlign.Center
             )
         }
@@ -656,7 +672,7 @@ private fun LoginScreen(
                         value = username,
                         onValueChange = { username = it; clearError() },
                         label = t["login.username"],
-                        accent = AzraelViolet,
+                        accent = AzraelPrimary,
                         leading = Icons.Filled.Person,
                         enabled = !busy
                     )
@@ -664,7 +680,7 @@ private fun LoginScreen(
                         value = password,
                         onValueChange = { password = it; clearError() },
                         label = t["login.password.new"],
-                        accent = AzraelViolet,
+                        accent = AzraelPrimary,
                         leading = Icons.Filled.Key,
                         isPassword = true,
                         visible = showPassword,
@@ -734,7 +750,7 @@ private fun LoginScreen(
                         onValueChange = { inviteCode = it.uppercase().take(11); clearError() },
                         label = t["login.invite.label"],
                         supporting = t["login.invite.hint"],
-                        accent = AzraelCyan,
+                        accent = AzraelSecondary,
                         leading = Icons.Filled.Key,
                         spaced = true,
                         enabled = !busy
@@ -743,7 +759,7 @@ private fun LoginScreen(
                         value = username,
                         onValueChange = { username = it; clearError() },
                         label = t["login.username"],
-                        accent = AzraelViolet,
+                        accent = AzraelPrimary,
                         leading = Icons.Filled.Person,
                         enabled = !busy
                     )
@@ -751,7 +767,7 @@ private fun LoginScreen(
                         value = displayName,
                         onValueChange = { displayName = it },
                         label = t["login.displayName"],
-                        accent = AzraelViolet,
+                        accent = AzraelPrimary,
                         leading = Icons.Filled.Person,
                         enabled = !busy
                     )
@@ -759,7 +775,7 @@ private fun LoginScreen(
                         value = password,
                         onValueChange = { password = it; clearError() },
                         label = t["login.password.new"],
-                        accent = AzraelViolet,
+                        accent = AzraelPrimary,
                         leading = Icons.Filled.Key,
                         isPassword = true,
                         visible = showPassword,
@@ -771,7 +787,7 @@ private fun LoginScreen(
                         value = password2,
                         onValueChange = { password2 = it; clearError() },
                         label = t["login.password.repeat"],
-                        accent = AzraelViolet,
+                        accent = AzraelPrimary,
                         leading = Icons.Filled.Key,
                         isPassword = true,
                         visible = showPassword,
@@ -862,7 +878,7 @@ private fun LoginScreen(
                 Icon(
                     Icons.Filled.Shield,
                     contentDescription = null,
-                    tint = AzraelCyan.copy(alpha = 0.5f),
+                    tint = AzraelSecondary.copy(alpha = 0.5f),
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(Modifier.width(6.dp))
@@ -888,7 +904,7 @@ private fun BrandMark() {
             modifier = Modifier
                 .size(62.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(Brush.linearGradient(listOf(AzraelViolet, AzraelCyan, AzraelRose)))
+                .background(Brush.linearGradient(listOf(AzraelPrimary, AzraelSecondary, AzraelDanger)))
                 .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(20.dp)),
             contentAlignment = Alignment.Center
         ) {
@@ -896,7 +912,7 @@ private fun BrandMark() {
                 "A",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
-                color = Color(0xFF0B0B14)
+                color = AzraelOnPrimary
             )
         }
         Spacer(Modifier.height(12.dp))
@@ -1099,8 +1115,8 @@ private fun GenderChips(selected: String, enabled: Boolean, onSelect: (String) -
             modifier = Modifier.fillMaxWidth()
         ) {
             listOf(
-                Triple("male", t["login.gender.male"], AzraelCyan),
-                Triple("female", t["login.gender.female"], AzraelRose)
+                Triple("male", t["login.gender.male"], AzraelSecondary),
+                Triple("female", t["login.gender.female"], AzraelDanger)
             ).forEach { (value, label, accent) ->
                 val active = selected == value
                 Box(
@@ -1189,7 +1205,7 @@ private fun AvatarPicker(
                 Text(
                     if (avatar == null) t["login.avatar.pick"] else t["login.avatar.change"],
                     style = MaterialTheme.typography.labelMedium,
-                    color = AzraelCyan.copy(alpha = 0.85f)
+                    color = AzraelSecondary.copy(alpha = 0.85f)
                 )
             }
             if (avatar != null) {
@@ -1201,7 +1217,7 @@ private fun AvatarPicker(
                     Icon(
                         Icons.Filled.Close,
                         contentDescription = t["login.avatar.remove"],
-                        tint = AzraelRose.copy(alpha = 0.8f),
+                        tint = AzraelDanger.copy(alpha = 0.8f),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1217,8 +1233,8 @@ private fun ProvisionKeyCard(value: String, onValueChange: (String) -> Unit, ena
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(AzraelCyan.copy(alpha = 0.06f))
-            .border(1.dp, AzraelCyan.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+            .background(AzraelSecondary.copy(alpha = 0.06f))
+            .border(1.dp, AzraelSecondary.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -1226,14 +1242,14 @@ private fun ProvisionKeyCard(value: String, onValueChange: (String) -> Unit, ena
             Icon(
                 Icons.Filled.Key,
                 contentDescription = null,
-                tint = AzraelCyan.copy(alpha = 0.8f),
+                tint = AzraelSecondary.copy(alpha = 0.8f),
                 modifier = Modifier.size(16.dp)
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 t["login.provision.label"],
                 style = MaterialTheme.typography.labelLarge,
-                color = AzraelCyan.copy(alpha = 0.95f)
+                color = AzraelSecondary.copy(alpha = 0.95f)
             )
         }
         Text(
@@ -1245,7 +1261,7 @@ private fun ProvisionKeyCard(value: String, onValueChange: (String) -> Unit, ena
             value = value,
             onValueChange = onValueChange,
             label = t["login.provision.name"],
-            accent = AzraelCyan,
+            accent = AzraelSecondary,
             leading = Icons.Filled.Key,
             spaced = true,
             enabled = enabled
@@ -1268,9 +1284,9 @@ private fun RememberDeviceRow(checked: Boolean, enabled: Boolean, onCheckedChang
             onCheckedChange = onCheckedChange,
             enabled = enabled,
             colors = CheckboxDefaults.colors(
-                checkedColor = AzraelCyan,
+                checkedColor = AzraelSecondary,
                 uncheckedColor = Color.White.copy(alpha = 0.35f),
-                checkmarkColor = Color(0xFF04212B)
+                checkmarkColor = AzraelOnPrimary
             )
         )
         Spacer(Modifier.width(4.dp))
@@ -1285,7 +1301,7 @@ private fun RememberDeviceRow(checked: Boolean, enabled: Boolean, onCheckedChang
 /** Статус/ошибка над кнопкой действия — как на сайте (красный текст под полями). */
 @Composable
 private fun StatusBanner(text: String, isError: Boolean) {
-    val accent = if (isError) Color(0xFFF87171) else AzraelCyan
+    val accent = if (isError) Color(0xFFF87171) else AzraelSecondary
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -1370,7 +1386,7 @@ private fun MainShell(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Filled.Block, contentDescription = null, tint = AzraelRose, modifier = Modifier.height(48.dp))
+            Icon(Icons.Filled.Block, contentDescription = null, tint = AzraelDanger, modifier = Modifier.height(48.dp))
             Spacer(Modifier.height(12.dp))
             Text(
                 t["main.noTabs"],
@@ -1494,7 +1510,7 @@ private fun TriStateHeader(profile: AppProfile, onRefreshBoot: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             RoleBadge(profile.role)
             IconButton(onClick = onRefreshBoot) {
-                Icon(Icons.Filled.Refresh, contentDescription = t["main.refresh"], tint = AzraelCyan)
+                Icon(Icons.Filled.Refresh, contentDescription = t["main.refresh"], tint = AzraelSecondary)
             }
         }
     }
@@ -1520,7 +1536,7 @@ private fun AvatarCircle(profile: AppProfile) {
             .width(40.dp)
             .height(40.dp)
             .background(roleColor(profile.role).copy(alpha = 0.35f), CircleShape)
-            .border(1.dp, AzraelCyan.copy(alpha = 0.4f), CircleShape),
+            .border(1.dp, AzraelSecondary.copy(alpha = 0.4f), CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(letter, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -1555,7 +1571,7 @@ private fun RowScope.SideRail(
                 modifier = Modifier.padding(horizontal = 8.dp),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = AzraelViolet
+                color = AzraelPrimary
             )
             Spacer(Modifier.height(14.dp))
             tabs.forEachIndexed { i, tab ->
@@ -1568,7 +1584,7 @@ private fun RowScope.SideRail(
             }
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onLogout) {
-                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = t["action.logout"], tint = AzraelRose)
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = t["action.logout"], tint = AzraelDanger)
             }
         }
     }
@@ -1634,7 +1650,7 @@ private fun AdminView(client: AppClient, profile: AppProfile) {
         GlassCard {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Label(t["profile.uid"])
-                Text(profile.uid, style = MaterialTheme.typography.bodySmall, color = AzraelCyan)
+                Text(profile.uid, style = MaterialTheme.typography.bodySmall, color = AzraelSecondary)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AccentButton(t["admin.health"]) {
                         scope.launch {
@@ -1646,8 +1662,8 @@ private fun AdminView(client: AppClient, profile: AppProfile) {
                         }
                     }
                 }
-                Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelViolet)
-                Text(health, style = MaterialTheme.typography.bodyMedium, color = AzraelCyan)
+                Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelPrimary)
+                Text(health, style = MaterialTheme.typography.bodyMedium, color = AzraelSecondary)
             }
         }
         GlassCard {
@@ -1659,7 +1675,7 @@ private fun AdminView(client: AppClient, profile: AppProfile) {
                 ) {
                     Text(t["admin.frozen"], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     IconButton(onClick = { scope.launch { busy = true; loadFrozen(); busy = false } }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelCyan)
+                        Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelSecondary)
                     }
                 }
                 if (frozen.isEmpty()) {
@@ -1817,7 +1833,7 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier.verticalScroll(rememberScrollState())
     ) {
-        Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelCyan)
+        Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelSecondary)
 
         if (openId == null) {
             GlassCard {
@@ -1829,7 +1845,7 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                         label = { Text(t["login.login.hint"]) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = fieldColors(AzraelCyan)
+                        colors = fieldColors(AzraelSecondary)
                     )
                     AccentButton(if (searching) t["chats.searching"] else t["chats.find"]) {
                         val q = searchQ.trim()
@@ -1871,9 +1887,9 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                         ) {
                             Column {
                                 Text(u.s("display_name")?.ifBlank { null } ?: u.s("username") ?: "?", fontWeight = FontWeight.Bold)
-                                Text("@${u.s("username") ?: "?"} · uid $uid", style = MaterialTheme.typography.labelSmall, color = AzraelCyan)
+                                Text("@${u.s("username") ?: "?"} · uid $uid", style = MaterialTheme.typography.labelSmall, color = AzraelSecondary)
                             }
-                            Icon(Icons.Filled.PersonAdd, contentDescription = null, tint = AzraelViolet)
+                            Icon(Icons.Filled.PersonAdd, contentDescription = null, tint = AzraelPrimary)
                         }
                     }
                 }
@@ -1903,7 +1919,7 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Box(
                                         modifier = Modifier.height(8.dp).width(8.dp).background(
-                                            if (online[c.partnerId] == true) Color(0xFF4CD964) else AzraelRose,
+                                            if (online[c.partnerId] == true) AzraelPrimary else AzraelDanger,
                                             CircleShape
                                         )
                                     )
@@ -1918,7 +1934,7 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                             }
                             if (c.unread > 0) {
                                 Box(
-                                    modifier = Modifier.background(AzraelRose, CircleShape).padding(horizontal = 8.dp, vertical = 2.dp)
+                                    modifier = Modifier.background(AzraelDanger, CircleShape).padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) { Text("${c.unread}", color = Color.White, style = MaterialTheme.typography.labelSmall) }
                             }
                         }
@@ -1990,7 +2006,7 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                 }
                 Text(openName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 IconButton(onClick = { scope.launch { try { refreshOpen() } catch (e: Exception) { status = errText(e) } } }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelCyan)
+                    Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelSecondary)
                 }
             }
             GlassCard {
@@ -2020,7 +2036,7 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                         modifier = Modifier
                             .fillMaxWidth(0.85f)
                             .background(
-                                if (m.mine) AzraelViolet.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.08f),
+                                if (m.mine) AzraelPrimary.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.08f),
                                 RoundedCornerShape(16.dp)
                             )
                             .padding(12.dp),
@@ -2031,8 +2047,8 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                         }
                         m.fileName?.let { name ->
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.AttachFile, contentDescription = null, tint = AzraelCyan)
-                                Text(name, style = MaterialTheme.typography.bodyMedium, color = AzraelCyan, maxLines = 1)
+                                Icon(Icons.Filled.AttachFile, contentDescription = null, tint = AzraelSecondary)
+                                Text(name, style = MaterialTheme.typography.bodyMedium, color = AzraelSecondary, maxLines = 1)
                             }
                             // Ссылка на вложение сервер отдаёт только для свежего fileToken.
                             m.fileToken?.let { token ->
@@ -2089,7 +2105,7 @@ private fun ChatsListSection(client: AppClient, profile: AppProfile, modifier: M
                         },
                         label = { Text(t["chats.message.hint"]) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = fieldColors(AzraelViolet)
+                        colors = fieldColors(AzraelPrimary)
                     )
                     AccentButton(if (busy) t["chats.sending"] else t["action.send"]) {
                         if (busy) return@AccentButton
@@ -2170,9 +2186,9 @@ private fun AiChatSection(client: AppClient, modifier: Modifier = Modifier) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Text(t["chats.ai"], style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            IconButton(onClick = { refresh() }) { Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelCyan) }
+            IconButton(onClick = { refresh() }) { Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelSecondary) }
         }
-        Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelCyan)
+        Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelSecondary)
         if (chats.isEmpty()) {
             Label(t["ai.history.empty"])
         }
@@ -2194,7 +2210,7 @@ private fun AiChatSection(client: AppClient, modifier: Modifier = Modifier) {
                         t("chats.messagesCount", c.i("msg_count") ?: 0) +
                         (c.s("updated_at")?.let { " · $it" } ?: ""),
                         style = MaterialTheme.typography.labelSmall,
-                        color = AzraelViolet
+                        color = AzraelPrimary
                     )
                 }
             }
@@ -2221,7 +2237,7 @@ private fun AiChatSection(client: AppClient, modifier: Modifier = Modifier) {
                     onValueChange = { prompt = it },
                     label = { Text(t["ai.hint"]) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelCyan)
+                    colors = fieldColors(AzraelSecondary)
                 )
                 AccentButton(if (busy) t["ai.thinking"] else t["ai.ask"]) {
                     val text = prompt.trim()
@@ -2302,7 +2318,7 @@ private fun ShortenerView(client: AppClient) {
         ) {
             Text(t["tab.shortener"], style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             IconButton(onClick = { refresh() }) {
-                Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelCyan)
+                Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelSecondary)
             }
         }
         GlassCard {
@@ -2313,7 +2329,7 @@ private fun ShortenerView(client: AppClient) {
                     label = { Text(t["short.urlLabel"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
+                    colors = fieldColors(AzraelPrimary)
                 )
                 OutlinedTextField(
                     value = custom,
@@ -2321,7 +2337,7 @@ private fun ShortenerView(client: AppClient) {
                     label = { Text(t["short.codeLabel"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelCyan)
+                    colors = fieldColors(AzraelSecondary)
                 )
                 AccentButton(t["action.create"]) {
                     val u = url.trim()
@@ -2345,14 +2361,14 @@ private fun ShortenerView(client: AppClient) {
                         } catch (e: Exception) { status = errText(e) }
                     }
                 }
-                Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelCyan)
+                Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelSecondary)
             }
         }
 
         if (lastShort.isNotBlank()) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(lastShort, style = MaterialTheme.typography.titleMedium, color = AzraelCyan, fontWeight = FontWeight.Bold)
+                    Text(lastShort, style = MaterialTheme.typography.titleMedium, color = AzraelSecondary, fontWeight = FontWeight.Bold)
                     AccentButton(t["short.copyLink"]) {
                         clipboard.setText(AnnotatedString(lastShort))
                         status = t["short.linkCopied"]
@@ -2365,12 +2381,12 @@ private fun ShortenerView(client: AppClient) {
             val shortUrl = "https://azrael-lab.xyz/s/${r.code}"
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(shortUrl, style = MaterialTheme.typography.titleSmall, color = AzraelCyan, fontWeight = FontWeight.Bold)
+                    Text(shortUrl, style = MaterialTheme.typography.titleSmall, color = AzraelSecondary, fontWeight = FontWeight.Bold)
                     Text(r.url, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f), maxLines = 2)
                     Label(t("short.clicks", r.clicks ?: 0) + (r.created?.let { " · $it" } ?: ""))
                     val shownQr = if (qrCode == r.code) qrBitmap(qrCode) else null
                     if (qrCode == r.code && shownQr == null) {
-                        Text(qrError.ifBlank { t["short.qrUnavailable"] }, style = MaterialTheme.typography.bodySmall, color = AzraelRose)
+                        Text(qrError.ifBlank { t["short.qrUnavailable"] }, style = MaterialTheme.typography.bodySmall, color = AzraelDanger)
                     }
                     shownQr?.let { bmp ->
                         Image(
@@ -2411,7 +2427,7 @@ private fun ShortenerView(client: AppClient) {
                                     status = t["short.deleted"]
                                 } catch (e: Exception) { status = errText(e) }
                             }
-                        }) { Icon(Icons.Filled.Delete, contentDescription = t["action.delete"], tint = AzraelRose) }
+                        }) { Icon(Icons.Filled.Delete, contentDescription = t["action.delete"], tint = AzraelDanger) }
                     }
                 }
             }
@@ -2465,14 +2481,14 @@ private fun VpnView(client: AppClient) {
         ) {
             Text("VPN", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             IconButton(onClick = { refreshAll() }) {
-                Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelCyan)
+                Icon(Icons.Filled.Refresh, contentDescription = t["action.refresh"], tint = AzraelSecondary)
             }
         }
-        if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelCyan)
+        if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelSecondary)
         if (error.isNotBlank()) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(t["vpn.error"], style = MaterialTheme.typography.titleSmall, color = AzraelRose, fontWeight = FontWeight.Bold)
+                    Text(t["vpn.error"], style = MaterialTheme.typography.titleSmall, color = AzraelDanger, fontWeight = FontWeight.Bold)
                     Text(error, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
                 }
             }
@@ -2485,7 +2501,7 @@ private fun VpnView(client: AppClient) {
                 if (s == null) {
                     Label(t["vpn.summaryNotLoaded"])
                 } else {
-                    Text(t("vpn.totalAlive", s.i("total") ?: 0, s.i("alive") ?: 0), style = MaterialTheme.typography.bodyMedium, color = AzraelCyan)
+                    Text(t("vpn.totalAlive", s.i("total") ?: 0, s.i("alive") ?: 0), style = MaterialTheme.typography.bodyMedium, color = AzraelSecondary)
                     val sub = s.s("subUrl") ?: ""
                     Label(t["vpn.sub.hint"])
                     OutlinedTextField(
@@ -2494,7 +2510,7 @@ private fun VpnView(client: AppClient) {
                         readOnly = true,
                         label = { Text("subUrl") },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = fieldColors(AzraelViolet)
+                        colors = fieldColors(AzraelPrimary)
                     )
                     if (sub.isNotBlank()) {
                         AccentButton(t["vpn.sub.copy"]) {
@@ -2552,7 +2568,7 @@ private fun VpnView(client: AppClient) {
                             "${v.s("flag") ?: ""} ${v.s("name") ?: "?"} · ${v.s("host") ?: "?"}:${v.s("port") ?: "?"} " +
                                 v.s("latency")?.let { "· ${t("vpn.ms", it)}" } ?: "",
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (alive) Color(0xFF4CD964) else Color.White.copy(alpha = 0.5f),
+                            color = if (alive) AzraelPrimary else AzraelTextDim,
                             modifier = Modifier.weight(1f),
                             maxLines = 1
                         )
@@ -2560,7 +2576,7 @@ private fun VpnView(client: AppClient) {
                             IconButton(onClick = {
                                 clipboard.setText(AnnotatedString(link))
                                 status = t["vpn.configCopied"]
-                            }) { Icon(Icons.Filled.ContentCopy, contentDescription = t["vpn.copyConfig"], tint = AzraelCyan) }
+                            }) { Icon(Icons.Filled.ContentCopy, contentDescription = t["vpn.copyConfig"], tint = AzraelSecondary) }
                         }
                     }
                 }
@@ -2577,7 +2593,7 @@ private fun VpnView(client: AppClient) {
                     Text(
                         if (a.b("awgEnabled")) t["on"] else t["notConfigured"],
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (a.b("awgEnabled")) AzraelCyan else Color.White.copy(alpha = 0.6f)
+                        color = if (a.b("awgEnabled")) AzraelSecondary else Color.White.copy(alpha = 0.6f)
                     )
                     a.s("endpoint")?.let { Label("endpoint: $it") }
                     val conf = a.s("vpnConfig")
@@ -2588,7 +2604,7 @@ private fun VpnView(client: AppClient) {
                             readOnly = true,
                             label = { Text("vpnConfig") },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = fieldColors(AzraelCyan)
+                            colors = fieldColors(AzraelSecondary)
                         )
                         AccentButton(t["vpn.awg.copy"]) {
                             clipboard.setText(AnnotatedString(conf))
@@ -2715,7 +2731,7 @@ private fun SettingsView(
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Text(t["settings.title"], style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelCyan)
+        Text(status, style = MaterialTheme.typography.bodyMedium, color = AzraelSecondary)
 
         GlassCard {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2778,7 +2794,7 @@ private fun SettingsView(
                     label = { Text(t["profile.name"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
+                    colors = fieldColors(AzraelPrimary)
                 )
                 OutlinedTextField(
                     value = tag,
@@ -2786,7 +2802,7 @@ private fun SettingsView(
                     label = { Text(t["profile.tag"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
+                    colors = fieldColors(AzraelPrimary)
                 )
                 OutlinedTextField(
                     value = gender,
@@ -2794,7 +2810,7 @@ private fun SettingsView(
                     label = { Text(t["profile.gender"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
+                    colors = fieldColors(AzraelPrimary)
                 )
                 AccentButton(t["profile.save"]) {
                     scope.launch {
@@ -2845,7 +2861,7 @@ private fun SettingsView(
                     Checkbox(
                         checked = hiddenFromSearch,
                         onCheckedChange = { hiddenFromSearch = it },
-                        colors = CheckboxDefaults.colors(checkedColor = AzraelCyan)
+                        colors = CheckboxDefaults.colors(checkedColor = AzraelSecondary)
                     )
                     Text(t["privacy.hidden"], style = MaterialTheme.typography.bodyMedium)
                 }
@@ -2916,7 +2932,7 @@ private fun SettingsView(
                     label = { Text(t["login.currentPassword"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
+                    colors = fieldColors(AzraelPrimary)
                 )
                 OutlinedTextField(
                     value = newPassword,
@@ -2924,7 +2940,7 @@ private fun SettingsView(
                     label = { Text(t["login.newPassword"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelViolet)
+                    colors = fieldColors(AzraelPrimary)
                 )
                 AccentButton(t["login.changePassword"]) {
                     if (oldPassword.isEmpty() || newPassword.length < 8) {
@@ -2965,7 +2981,7 @@ private fun SettingsView(
                 if (provisionKey.isNotBlank()) {
                     GlassCard {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(provisionKey, color = AzraelCyan, fontWeight = FontWeight.Bold)
+                            Text(provisionKey, color = AzraelSecondary, fontWeight = FontWeight.Bold)
                             AccentButton(t["otp.copy"]) {
                                 clipboard.setText(AnnotatedString(provisionKey))
                                 status = t["devices.key.copied"]
@@ -2991,7 +3007,7 @@ private fun SettingsView(
                     label = { Text(t["otp.code"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelCyan)
+                    colors = fieldColors(AzraelSecondary)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AccentButton(t["otp.issue"]) {
@@ -3024,7 +3040,7 @@ private fun SettingsView(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(t["admin.invites"], style = MaterialTheme.typography.titleMedium)
                 if (myCode.isNotBlank()) {
-                    Text(t("admin.myCode", myCode), color = AzraelCyan, fontWeight = FontWeight.Bold)
+                    Text(t("admin.myCode", myCode), color = AzraelSecondary, fontWeight = FontWeight.Bold)
                     AccentButton(t["admin.copyMyCode"]) {
                         clipboard.setText(AnnotatedString(myCode))
                         status = t["admin.codeCopied"]
@@ -3055,7 +3071,7 @@ private fun SettingsView(
                             IconButton(onClick = {
                                 clipboard.setText(AnnotatedString(code))
                                 status = t["admin.codeCopied"]
-                            }) { Icon(Icons.Filled.ContentCopy, contentDescription = t["action.copy"], tint = AzraelCyan) }
+                            }) { Icon(Icons.Filled.ContentCopy, contentDescription = t["action.copy"], tint = AzraelSecondary) }
                             IconButton(onClick = {
                                 scope.launch {
                                     try {
@@ -3064,7 +3080,7 @@ private fun SettingsView(
                                         refreshInvites()
                                     } catch (e: Exception) { status = errText(e) }
                                 }
-                            }) { Icon(Icons.Filled.Archive, contentDescription = t["chats.archive"], tint = AzraelViolet) }
+                            }) { Icon(Icons.Filled.Archive, contentDescription = t["chats.archive"], tint = AzraelPrimary) }
                         }
                     }
                 }
@@ -3086,7 +3102,7 @@ private fun SettingsView(
                 Text(
                     "$devicesActive / $devicesMax",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (devicesActive >= devicesMax) AzraelRose else AzraelCyan
+                    color = if (devicesActive >= devicesMax) AzraelDanger else AzraelSecondary
                 )
                 Text(
                     t("devices.limit1", devicesMax) +
@@ -3118,10 +3134,10 @@ private fun SettingsView(
                                     else -> st
                                 },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (st == "active") AzraelCyan else AzraelRose
+                                color = if (st == "active") AzraelSecondary else AzraelDanger
                             )
                             if (isCurrent) {
-                                Text(t["devices.thisDevice.lower"], style = MaterialTheme.typography.labelMedium, color = AzraelViolet)
+                                Text(t["devices.thisDevice.lower"], style = MaterialTheme.typography.labelMedium, color = AzraelPrimary)
                             }
                         }
                         Label(
@@ -3135,7 +3151,7 @@ private fun SettingsView(
                                 if (isCurrent) t["devices.thisDevice"]
                                 else t("devices.revoke.warn", title),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = AzraelRose
+                                color = AzraelDanger
                             )
                             AccentButton(t["devices.revoke.yes"]) {
                                 scope.launch {
@@ -3168,7 +3184,7 @@ private fun SettingsView(
                     label = { Text(t["login.provision.label"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelCyan)
+                    colors = fieldColors(AzraelSecondary)
                 )
                 AccentButton(t["devices.check"]) {
                     scope.launch {
@@ -3194,7 +3210,7 @@ private fun SettingsView(
                     Text(
                         t["channel.l2.unavailable"],
                         style = MaterialTheme.typography.bodySmall,
-                        color = AzraelRose
+                        color = AzraelDanger
                     )
                 }
             }
@@ -3208,7 +3224,7 @@ private fun SettingsView(
                 Text(
                     t["channel.key.ready"],
                     style = MaterialTheme.typography.bodySmall,
-                    color = AzraelCyan
+                    color = AzraelSecondary
                 )
                 AccentButton(t["channel.check.health"]) {
                     scope.launch {
@@ -3224,7 +3240,7 @@ private fun SettingsView(
                     label = { Text(t["channel.l2.key"]) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelCyan)
+                    colors = fieldColors(AzraelSecondary)
                 )
                 AccentButton(t["channel.l2.apply"]) {
                     AppRuntime.srvXPubB64 = l2Pub.trim().ifBlank { null }
@@ -3243,7 +3259,7 @@ private fun SettingsView(
                     label = { Text("https://…/api/gateway/v1") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors(AzraelCyan)
+                    colors = fieldColors(AzraelSecondary)
                 )
                 AccentButton(t["vpn.connect"]) {
                     val url = normalizedEndpoint(gatewayUrl)
@@ -3282,7 +3298,7 @@ private fun SettingsView(
                 AccentButton(t["channel.logout"]) { onLogout() }
                 Label(t["profile.delete.warn"])
                 if (deleteConfirm) {
-                    Text(t("profile.delete.confirm", profile.username), color = AzraelRose)
+                    Text(t("profile.delete.confirm", profile.username), color = AzraelDanger)
                     AccentButton(t["profile.delete.yes"]) {
                         scope.launch {
                             status = t["common.deleting"]
@@ -3349,7 +3365,7 @@ private fun AccentButton(label: String, modifier: Modifier = Modifier, onClick: 
         shape = RoundedCornerShape(14.dp),
         modifier = modifier,
         colors = ButtonDefaults.buttonColors(
-            containerColor = AzraelViolet.copy(alpha = 0.3f),
+            containerColor = AzraelPrimary.copy(alpha = 0.3f),
             contentColor = Color.White
         )
     ) {

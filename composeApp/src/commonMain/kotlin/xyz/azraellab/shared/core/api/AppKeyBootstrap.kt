@@ -10,12 +10,19 @@ import xyz.azraellab.shared.core.protocol.httpGetJson
  * Первичная выдача ключа канала при первом запуске.
  *
  * Пользователь ключ не вводит и не видит: программа сама забирает его один раз
- * с открытой точки `GET /api/app/bootstrap` и кладёт в AppVault. Благодаря этому
- * ключ не лежит в сборке, а его ротация на сервере не требует нового релиза APK.
+ * с `GET /api/app/bootstrap?devId=…` и кладёт в AppVault. Благодаря этому ключ не
+ * лежит в сборке, а его ротация на сервере не требует нового релиза APK.
+ *
+ * Сервер отдаёт НЕ общий ключ, а производный для этой установки:
+ * `A_dev = HMAC(APP_V1_KEY, "AZRAEL-APP|dev|v1|<devId>")`. Мастер остаётся на
+ * сервере, поэтому перехват ответа на чужом устройстве не даёт ни этот ключ, ни
+ * ключи остальных установок. Тот же devId клиент затем передаёт в заголовке
+ * `x-azrael-kid` каждого запроса, а поверх A_dev работает штатная ротация
+ * поколений — клиенту мастер не нужен.
  *
  * Зеркало `padKeyBytes()` из site/lib/app-secure.ts. XOR-pad — обфускация, а не
  * криптография: смысл в том, чтобы ключ не лежал в JSON открытым текстом. Секрет
- * канала держит TLS и то, что ответ не кэшируется (`cache-control: no-store`).
+ * канала держит TLS плюс привязка значения к ключу устройства.
  */
 object AppKeyBootstrap {
 
@@ -28,10 +35,13 @@ object AppKeyBootstrap {
      * Адрес точки выдачи по адресу API: `https://host/api/app/v1` →
      * `https://host/api/app/bootstrap`. Если адрес уже указывает на саму точку или
      * не содержит сегмента API — берём корень сайта.
+     *
+     * [devId] обязателен: без него сервер не может выдать ключ этой установки и
+     * отвечает 400 (выдать общий ключ он больше не вправе).
      */
-    fun bootstrapUrl(apiUrl: String): String {
+    fun bootstrapUrl(apiUrl: String, devId: String): String {
         val base = apiUrl.trim().substringBefore("/api/app/").trimEnd('/')
-        return "$base/api/app/bootstrap"
+        return "$base/api/app/bootstrap?devId=${devId.trim()}"
     }
 
     /** base64(XOR pad) → сырые байты ключа; null, если строка не декодируется. */
@@ -47,8 +57,8 @@ object AppKeyBootstrap {
      * Забрать ключ канала. Возвращает сырые 32 байта или null, если сервер не
      * настроен (`configured: false`), ответил не-200 или ключ не распознан.
      */
-    fun fetch(apiUrl: String, timeoutMs: Int = 8_000): ByteArray? {
-        val text = httpGetJson(bootstrapUrl(apiUrl), timeoutMs) ?: return null
+    fun fetch(apiUrl: String, devId: String, timeoutMs: Int = 8_000): ByteArray? {
+        val text = httpGetJson(bootstrapUrl(apiUrl, devId), timeoutMs) ?: return null
         val obj = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
         if (obj["ok"]?.jsonPrimitive?.content != "true") return null
         if (obj["configured"]?.jsonPrimitive?.content != "true") return null

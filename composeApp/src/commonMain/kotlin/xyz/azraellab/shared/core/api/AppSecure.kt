@@ -23,6 +23,9 @@ object AppSecure {
     const val HDR_SIG = "x-azrael-sig"
     const val HDR_VERSION = "x-azrael-version"
     const val HDR_KG = "x-azrael-kg"           // поколение ключа (ротация)
+    // devId установки, которой выдан ключ канала: сервер по нему пересчитывает
+    // per-install ключ вместо того, чтобы держать выданные ключи в базе.
+    const val HDR_KID = "x-azrael-kid"
 
     // Трёхсторонний конверт (L2): клиент ↔ сайт ↔ внутренний роут /v2/l2.
     const val HDR_L2 = "x-azrael-l2"           // "1" — запрос требует вскрытия на внутреннем слое

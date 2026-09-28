@@ -19,7 +19,6 @@ import xyz.azraellab.shared.core.crypto.randomBytes
 import xyz.azraellab.shared.core.protocol.HttpResult
 import xyz.azraellab.shared.core.protocol.Protocol
 import xyz.azraellab.shared.core.protocol.defaultAppSrvPubB64
-import xyz.azraellab.shared.core.protocol.httpPostJson
 import xyz.azraellab.shared.core.protocol.httpPostJsonWithHeaders
 import xyz.azraellab.shared.platformName
 
@@ -256,6 +255,16 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
     /** Ключи установки: приватный+публичный raw-32 Ed25519 и вычисленный devId. */
     private class DeviceKeys(val devId: String, val priv: ByteArray, val pub: ByteArray)
 
+    /**
+     * Установка привязана к аккаунту. Это НЕ то же самое, что [device]: ключи
+     * установки появляются уже на первом запуске (без них не выдать ключ канала),
+     * а привязка к аккаунту при этом ещё не создана, и регистрация обязана быть
+     * разрешена. В vault хранится полем `bound`; если поля нет (vault, созданный до
+     * появления per-install ключей), привязка считается состоявшейся вместе с
+     * ключами — раньше они появлялись только при привязке.
+     */
+    private var deviceBound: Boolean = false
+
     private var device: DeviceKeys? = loadPersistedState()
 
     private fun loadPersistedState(): DeviceKeys? {
@@ -264,12 +273,16 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         token = obj["token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         savedLogin = obj["login"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         savedPassword = obj["pass"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+        val hasBoundFlag = obj["bound"] != null
+        deviceBound = hasBoundFlag && obj["bound"]?.jsonPrimitive?.content == "true"
         val devId = obj["devId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: return null
         val priv = obj["devPriv"]?.jsonPrimitive?.content
             ?.let { runCatching { Base64Codec.decode(it) }.getOrNull() } ?: return null
         val pub = obj["devPub"]?.jsonPrimitive?.content
             ?.let { runCatching { Base64Codec.decode(it) }.getOrNull() } ?: return null
         if (priv.size != 32 || pub.size != 32) return null
+        // Старый vault без флага: тогда ключи и означали привязку.
+        if (!hasBoundFlag) deviceBound = true
         return DeviceKeys(devId, priv, pub)
     }
 
@@ -283,6 +296,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
             put("devId", dev.devId)
             put("devPriv", Base64Codec.encode(dev.priv))
             put("devPub", Base64Codec.encode(dev.pub))
+            if (deviceBound) put("bound", "true")
             token?.let { put("token", it) }
             savedLogin?.let { put("login", it) }
             savedPassword?.let { put("pass", it) }
@@ -311,8 +325,15 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         persistState()
     }
 
-    /** Привязана ли установка (есть ключи + devId). */
-    fun isDeviceBound(): Boolean = device != null
+    /**
+     * Привязана ли установка к аккаунту. Ключи установки ([device]) для этого
+     * недостаточно: они создаются на первом запуске ради ключа канала, и до
+     * привязки регистрация должна быть разрешена.
+     */
+    fun isDeviceBound(): Boolean = device != null && deviceBound
+
+    /** Есть ли ключи установки (нужны для подписи device-запросов и заголовка kid). */
+    fun hasDeviceKeys(): Boolean = device != null
 
     /** Идентификатор установки для сервера (sha256 от deviceId + публичного ключа). */
     fun deviceId(): String? = device?.devId
@@ -367,6 +388,9 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
     private fun persistBinding() {
         val kp = pendingBind ?: return
         device = kp
+        // Привязка состоялась только сейчас: до этого ключи могли лежать в vault
+        // сами по себе (их создали ради ключа канала на первом запуске).
+        deviceBound = true
         pendingBind = null
         persistState()
     }
@@ -493,7 +517,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
 
     /** devId = sha256hex("AZRAEL-DEV|<localDeviceId>|<pubB64>") — зеркало lib/app-device.ts. */
     private fun devIdFrom(localDeviceId: String, pubB64: String): String =
-        Hex.toHex(Crypto.sha256("AZRAEL-DEV|$localDeviceId|$pubB64".toByteArray(Charsets.UTF_8)))
+        AppInstall.devIdFrom(localDeviceId, pubB64)
 
     /** Ed25519-подпись device-запроса: "AZRAEL-DEV|ts|nonce|sha256hex(body)". */
     private fun deviceHeaders(ts: Long, nonce: String, body: String): Map<String, String> {
@@ -609,6 +633,9 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
                 put(AppSecure.HDR_NONCE, sealed.nonce)
                 put(AppSecure.HDR_SIG, sealed.sig)
                 put(AppSecure.HDR_KG, gen.toString())
+                // Ключ канала выдан этой установке — сервер пересчитывает per-install
+                // ключ по devId и подписывает ответ тем же ключом.
+                device?.devId?.let { put(AppSecure.HDR_KID, it) }
                 if (l2 != null) {
                     put(AppSecure.HDR_L2, "1")
                     put(AppSecure.HDR_EPH, l2.ephPubB64)
@@ -641,9 +668,12 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
                 rotationsApplied += 1
             }
         } else {
-            val raw = httpPostJson(baseUrl, plainJson, timeoutMs = timeoutMs)
-                ?: throw AppException(AppErrorCode.NETWORK, "network: no response")
-            resp = HttpResult(raw, 200, emptyMap())
+            // Fail-closed: без ключа установки запрос не уходит. Раньше здесь был
+            // plaintext-вызов без подписи и без проверки ответа — при любой потере
+            // ключа (удалённый app-key, битый vault) клиент молча слал данные
+            // открытым текстом и принимал неподписанный ответ. Ключ выдаёт
+            // bootstrap до создания клиента, поэтому сюда мы попадать не должны.
+            throw AppException(AppErrorCode.FORBIDDEN, "channel key missing: refusing plaintext request")
         }
         val root = runCatching {
             json.parseToJsonElement(resp.body ?: "").jsonObject

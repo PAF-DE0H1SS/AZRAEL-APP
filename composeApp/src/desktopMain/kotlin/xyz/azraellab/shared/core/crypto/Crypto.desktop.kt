@@ -4,7 +4,6 @@ import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.XECPublicKeySpec
 import javax.crypto.Cipher
@@ -19,19 +18,13 @@ actual object Crypto {
 
     private val rnd = SecureRandom()
 
-    // PKCS8-префиксы для raw-32 приватных ключей (X25519 / Ed25519).
+    // PKCS8-префикс для raw-32 приватного ключа X25519.
     private val PKCS8_X25519 = byteArrayOf(
         0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x03, 0x22, 0x04, 0x20
     )
-    private val PKCS8_ED25519 = byteArrayOf(
-        0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20
-    )
-    // SPKI-префиксы для raw-32 публичных ключей (X25519 / Ed25519).
+    // SPKI-префикс для raw-32 публичного ключа X25519.
     private val SPKI_X25519 = byteArrayOf(
         0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x03, 0x21, 0x00
-    )
-    private val SPKI_ED25519 = byteArrayOf(
-        0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00
     )
 
     // X25519 кодирует координату little-endian; JCA BigInteger ждёт big-endian,
@@ -88,22 +81,12 @@ actual object Crypto {
     }
 
     actual fun ed25519KeyPair(seed: ByteArray?): KeyPairData {
-        val kpg = KeyPairGenerator.getInstance("Ed25519")
-        val kp = kpg.generateKeyPair()
-        return KeyPairData(
-            publicKey = stripPrefix(kp.public.encoded, SPKI_ED25519),
-            privateKey = stripPrefix(kp.private.encoded, PKCS8_ED25519)
-        )
+        val s = seed ?: ByteArray(32).also { rnd.nextBytes(it) }
+        return KeyPairData(publicKey = Ed25519.publicKeyFromSeed(s), privateKey = s.copyOf())
     }
 
-    actual fun ed25519Sign(privKey: ByteArray, message: ByteArray): ByteArray {
-        val kf = KeyFactory.getInstance("Ed25519")
-        val priv = kf.generatePrivate(PKCS8EncodedKeySpec(concatBytes(PKCS8_ED25519, privKey)))
-        val sig = Signature.getInstance("Ed25519")
-        sig.initSign(priv)
-        sig.update(message)
-        return sig.sign()
-    }
+    actual fun ed25519Sign(privKey: ByteArray, message: ByteArray): ByteArray =
+        Ed25519.sign(privKey, message)
 
     actual fun hkdfSha256(ikm: ByteArray, salt: ByteArray, info: ByteArray, length: Int): ByteArray = try {
         // Extract: PRK = HMAC-SHA256(salt, IKM); короткая соль до-заполняется нулями.
@@ -156,6 +139,8 @@ actual object Crypto {
     }
 
     actual fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
+
+    actual fun randomBytes(size: Int): ByteArray = ByteArray(size).also { rnd.nextBytes(it) }
 
     /** Срезает DER-префикс (SPKI/PKCS8), оставляя только raw-32 полезные байты. */
     private fun stripPrefix(encoded: ByteArray, prefix: ByteArray): ByteArray {

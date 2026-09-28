@@ -48,6 +48,24 @@ expect fun decodeImageBase64(data: String): ImageBitmap?
  *
  * Снять можно ТОЛЬКО с сайта через /admin (x-azrael-release в подписанном ответе).
  */
+/**
+ * Задать каталог хранения данных установки до первого обращения к [AppVault].
+ *
+ * На Android доступ к `context.filesDir` есть только у Activity, а хранилище
+ * нужно уже в конструкторе клиента. Старый вариант брал `java.io.tmpdir`,
+ * который на Android указывает на cache-каталог: система вправе стереть его при
+ * нехватке места, и вместе с ним терялись ключ установки и app-key — то есть
+ * приложение теряло привязку к аккаунту без всякой вины пользователя.
+ * Кэш для этого не годится: в filesDir система не вмешивается сама, а
+ * правила бэкапа (`backup_rules.xml`) этот каталог исключают.
+ *
+ * На десктопе вызов ничего не делает — там путь свой.
+ */
+expect fun initStorageDir(dir: String)
+
+/** Диагностический лог непойманной ошибки: на Android в logcat, на desktop в stderr. */
+expect fun logAzraelError(tag: String, message: String, error: Throwable?)
+
 expect object AppTrap {
     /** Стабильный идентификатор устройства (для отзыва через /admin). */
     fun deviceId(): String
@@ -84,8 +102,18 @@ expect object AppVault {
      */
     fun readAppKey(): String?
 
-    /** Сохранить ключ канала (base64). Перезаписывает. */
-    fun writeAppKey(keyB64: String): Boolean
+    /**
+     * К какому devId относится сохранённый ключ канала (см. [readAppKey]).
+     * null — ключ получен старой версией программы, где маркера не было: такой
+     * ключ использовать нельзя, его надо заменить, забрать заново по devId.
+     */
+    fun readAppKeyDevId(): String?
+
+    /**
+     * Сохранить ключ канала (base64) вместе с devId, для которого он получен.
+     * Ключ привязан к установке, поэтому при другом devId он не подходит.
+     */
+    fun writeAppKey(devId: String, keyB64: String): Boolean
 }
 
 /**

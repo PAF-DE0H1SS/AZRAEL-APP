@@ -44,29 +44,41 @@ class AppKeyBootstrapTest {
     @Test
     fun bootstrapUrlDerivedFromApiUrl() {
         assertEquals(
-            "https://azrael-lab.xyz/api/app/bootstrap",
-            AppKeyBootstrap.bootstrapUrl("https://azrael-lab.xyz/api/app/v1")
+            "https://azrael-lab.xyz/api/app/bootstrap?devId=abc123",
+            AppKeyBootstrap.bootstrapUrl("https://azrael-lab.xyz/api/app/v1", "abc123")
         )
     }
 
     @Test
     fun bootstrapUrlToleratesSlashAndTrailingPath() {
         assertEquals(
-            "https://azrael-lab.xyz/api/app/bootstrap",
-            AppKeyBootstrap.bootstrapUrl("https://azrael-lab.xyz/api/app/v1/")
+            "https://azrael-lab.xyz/api/app/bootstrap?devId=abc123",
+            AppKeyBootstrap.bootstrapUrl("https://azrael-lab.xyz/api/app/v1/", " abc123 ")
         )
         assertEquals(
-            "https://azrael-lab.xyz/api/app/bootstrap",
-            AppKeyBootstrap.bootstrapUrl("  https://azrael-lab.xyz/api/app/bootstrap  ")
+            "https://azrael-lab.xyz/api/app/bootstrap?devId=abc123",
+            AppKeyBootstrap.bootstrapUrl("  https://azrael-lab.xyz/api/app/bootstrap  ", "abc123")
         )
     }
 
     @Test
     fun bootstrapUrlFallsBackToSiteRoot() {
         assertEquals(
-            "https://azrael-lab.xyz/api/app/bootstrap",
-            AppKeyBootstrap.bootstrapUrl("https://azrael-lab.xyz")
+            "https://azrael-lab.xyz/api/app/bootstrap?devId=abc123",
+            AppKeyBootstrap.bootstrapUrl("https://azrael-lab.xyz", "abc123")
         )
+    }
+
+    /**
+     * devId обязан попадать в адрес: без него сервер не выдаёт ключ этой установки,
+     * а общий мастер-ключ выдавать больше нельзя.
+     */
+    @Test
+    fun bootstrapUrlAlwaysCarriesDevId() {
+        val devId = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        val url = AppKeyBootstrap.bootstrapUrl("https://azrael-lab.xyz/api/app/v1", devId)
+        assertTrue(url.endsWith("?devId=$devId"), "devId не попал в адрес: $url")
+        assertEquals(64, devId.length)
     }
 
     private fun assertContentEquals(expected: ByteArray, actual: ByteArray?) {

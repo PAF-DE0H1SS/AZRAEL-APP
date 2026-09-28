@@ -19,6 +19,14 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 
 actual fun platformName(): String = "Desktop (JVM)"
+/** На десктопе путь хранилища свой (user.home), вызов из мобильной Activity не нужен. */
+actual fun initStorageDir(dir: String): Unit = Unit
+
+actual fun logAzraelError(tag: String, message: String, error: Throwable?) {
+    System.err.println("[$tag] $message")
+    error?.printStackTrace()
+}
+
 
 @Composable
 actual fun rememberFilePicker(
@@ -96,7 +104,12 @@ actual object AppTrap {
         return digestDeviceId(machineId, hostname, System.getProperty("os.name"))
     }
 
-    actual fun isProtected(): Boolean = paths.any { it.isFile }
+    // Проверяем содержимое, а не сам факт существования файла: иначе любой
+    // пустой/поддельный файл с правильным именем «снимает» защиту, и клиент
+    // продолжит работу с отравленным каналом.
+    actual fun isProtected(): Boolean = paths.any { p ->
+        runCatching { p.isFile && p.readText().contains(MARK) }.getOrDefault(false)
+    }
 
     actual fun installProtection(): Boolean {
         var any = false
@@ -156,12 +169,28 @@ actual object AppVault {
             val f = file()
             val parent = f.parentFile
             if (!parent.exists()) parent.mkdirs()
+            // Секреты (ключ установки, device seed) лежат в этом каталоге,
+            // поэтому закрываем и каталог, и файл от других пользователей системы.
+            if (!parent.setReadable(false, false) ||
+                !parent.setWritable(false, false) ||
+                !parent.setExecutable(false, false)
+            ) return@runCatching false
+            parent.setReadable(true, true)
+            parent.setWritable(true, true)
+            parent.setExecutable(true, true)
             val tmp = Path.of(f.absolutePath + ".tmp")
             Files.write(tmp, data.toByteArray(Charsets.UTF_8))
+            restrictToOwner(tmp.toFile())
             Files.move(tmp, Path.of(f.absolutePath), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            restrictToOwner(f)
             true
         }.getOrDefault(false)
     }
+
+    /** 0600: содержимое vault читается только владельцем. */
+    private fun restrictToOwner(f: File): Boolean =
+        f.setReadable(false, false) && f.setWritable(false, false) &&
+            f.setReadable(true, true) && f.setWritable(true, true)
 
     // Ключ канала лежит рядом с vault, отдельным файлом: им читает AppVault ещё
     // до того, как собран AppClient (в конструкторе нужен ключ, а не наоборот).
@@ -170,18 +199,34 @@ actual object AppVault {
         return File(home, ".config/azraellab/app-key")
     }
 
-    actual fun readAppKey(): String? = runCatching {
-        val f = appKeyFile()
-        if (!f.isFile) return null
-        f.readText().trim().takeIf { it.isNotBlank() }
-    }.getOrNull()
+    actual fun readAppKey(): String? = appKeyFile().takeIf { it.isFile }?.let { f ->
+        runCatching { f.readText().trim() }.getOrNull()
+    }?.let(::parseAppKey)?.second
 
-    actual fun writeAppKey(keyB64: String): Boolean = runCatching {
+    // devId, которому принадлежит ключ. null у файла, записанного старой
+    // версией программы (там был только ключ) — такой ключ нельзя переиспользовать.
+    actual fun readAppKeyDevId(): String? = appKeyFile().takeIf { it.isFile }?.let { f ->
+        runCatching { f.readText().trim() }.getOrNull()
+    }?.let(::parseAppKey)?.first
+
+    // Формат файла: "devId\nkeyB64". Старый однострочный файл читается как
+    // (null, key) — с пометкой, что маркера нет.
+    private fun parseAppKey(raw: String): Pair<String?, String>? {
+        if (raw.isBlank()) return null
+        val nl = raw.indexOf('\n')
+        if (nl <= 0) return null to raw.trim()
+        val dev = raw.substring(0, nl).trim()
+        val key = raw.substring(nl + 1).trim()
+        if (dev.isEmpty() || key.isEmpty()) return null
+        return dev to key
+    }
+
+    actual fun writeAppKey(devId: String, keyB64: String): Boolean = runCatching {
         val f = appKeyFile()
         val parent = f.parentFile
         if (!parent.exists()) parent.mkdirs()
         val tmp = Path.of(f.absolutePath + ".tmp")
-        Files.write(tmp, keyB64.trim().toByteArray(Charsets.UTF_8))
+        Files.write(tmp, "$devId\n${keyB64.trim()}".toByteArray(Charsets.UTF_8))
         Files.move(tmp, Path.of(f.absolutePath), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         try {
             f.setReadable(false, false)

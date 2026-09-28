@@ -1,7 +1,5 @@
 package xyz.azraellab.shared.core.crypto
 
-import kotlin.random.Random
-
 expect object Crypto {
 
     /** Генерация X25519 keypair. Пара [seed] опциональна (детерминированные тесты). */
@@ -36,6 +34,9 @@ expect object Crypto {
 
     /** Общий секрет X25519 по raw-32 ключам (RFC 7748 little-endian u-координата). */
     fun x25519SharedRaw(privKey: ByteArray, pubKey: ByteArray): ByteArray
+
+    /** CSPRNG: криптостойкие байты для nonce, id, session token и ключей. */
+    fun randomBytes(size: Int): ByteArray
 }
 
 data class KeyPairData(val publicKey: ByteArray, val privateKey: ByteArray)
@@ -53,6 +54,5 @@ fun concatBytes(vararg arrays: ByteArray): ByteArray {
     return out
 }
 
-fun randomBytes(size: Int): ByteArray = ByteArray(size).also { b ->
-    Random.Default.nextBytes(b)
-}
+/** Все случайные значения в клиенте идут через платформенный SecureRandom. */
+fun randomBytes(size: Int): ByteArray = Crypto.randomBytes(size)

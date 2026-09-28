@@ -1,13 +1,19 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   include НЕ указываем: иначе бэкапится только перечисленное, а lint требует,
+   чтобы каждый exclude лежал внутри include. Без include действует обратное
+   правило — «всё, кроме перечисленного», и это как раз нужно: секреты установки
+   исключены, остальное (настройки, кэш картинок) переносится.
+
+   Пути — относительно filesDir. Данные установки лежат в filesDir/azraellab/
+   (см. initStorageDir), поэтому исключаем каталог целиком; старые исключения
+   по отдельным именам оставлены для установок, где каталог ещё не создан.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="file" path="azraellab/" />
+    <exclude domain="file" path=".azraellab/" />
+    <exclude domain="file" path="app-key" />
+    <exclude domain="file" path="vault.json" />
+    <exclude domain="file" path="device.lock" />
+    <exclude domain="sharedpref" path="azraellab_vault.xml" />
 </full-backup-content>

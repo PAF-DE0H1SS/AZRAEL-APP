@@ -5,6 +5,9 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+// Версия приложения — из gradle.properties (её же берёт desktopApp).
+val azraelVersion: String by project
+
 // Подпись release-APK: keystore и пароли лежат в signing/keystore.properties (никогда не коммитятся).
 // Если файла нет — release собирается unsigned (см. build-all.sh), чтобы CI и форки собирались без секретов.
 val keystoreProps = Properties().apply {
@@ -36,8 +39,8 @@ android {
         applicationId = "xyz.azraellab.app"
         minSdk = 33
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = azraelVersion
 
         externalNativeBuild {
             cmake {

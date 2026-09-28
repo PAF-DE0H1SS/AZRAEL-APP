@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.util.Base64
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -21,6 +22,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 actual fun platformName(): String = "Android"
+
+private var storageDir: File? = null
+
+/**
+ * Каталог данных установки: `filesDir/azraellab` — вне зоны досягаемости
+ * «очистки кэша» и исключён из бэкапа (см. backup_rules.xml).
+ */
+actual fun initStorageDir(dir: String) {
+    storageDir = File(dir, "azraellab")
+}
+
+actual fun logAzraelError(tag: String, message: String, error: Throwable?) {
+    Log.e(tag, message, error)
+}
 
 /**
  * Выбор файла через системный диалог (Storage Access Framework). Раньше здесь был
@@ -111,8 +126,13 @@ actual object AppTrap {
         return digestDeviceId(hw, Build.FINGERPRINT.take(48), Build.SERIAL)
     }
 
-    actual fun isProtected(): Boolean {
-        return baseDirs().any { base -> names.any { File(base, it).isFile } }
+    // Проверяем содержимое, а не факт существования: поддельный пустой файл
+    // с нужным именем не должен снимать защиту.
+    actual fun isProtected(): Boolean = baseDirs().any { base ->
+        names.any { n ->
+            runCatching { File(base, n).takeIf { it.isFile }?.readText()?.contains("AZRAEL-TRAP") == true }
+                .getOrDefault(false)
+        }
     }
 
     actual fun installProtection(): Boolean {
@@ -134,15 +154,46 @@ actual object AppTrap {
 }
 
 /**
- * Vault устройства на Android: пишется в тот же каталог state (java.io.tmpdir =
- * app-специфичный; user.dir/azraellab/state). Переживает рестарт процесса; гарантии
- * против очистки кэша системой нет (как и у любой data в песочнице без Context).
+ * Vault устройства на Android: `filesDir/azraellab` (задаётся из Activity через
+ * [initStorageDir]), при недоступном Context — прежний каталог из
+ * `java.io.tmpdir`, чтобы чтение не падало. Переживает рестарт процесса и не
+ * стирается системой при нехватке места, в отличие от cache.
  */
 actual object AppVault {
+    /**
+     * Каталог данных установки. Приоритет у [storageDir] (filesDir), который
+     * задаёт Activity: старый путь через `java.io.tmpdir` на Android — это
+     * cache-каталог, и система стирает его при нехватке места вместе с ключом
+     * установки и app-key. Файлы оттуда переносятся один раз, чтобы переход на
+     * новую версию не терял привязку к аккаунту.
+     */
     internal fun baseDir(): File {
+        val new = storageDir
+        if (new != null) {
+            if (!new.isDirectory) new.mkdirs()
+            migrateLegacy(new)
+            return new
+        }
         val tmp = System.getProperty("java.io.tmpdir")?.let { File(it) }?.takeIf { it.isDirectory }
         val userDir = System.getProperty("user.dir")?.let { File(it) }?.takeIf { it.isDirectory }
         return (tmp ?: userDir ?: File(".")).let { if (tmp != null) File(it, "azraellab") else it }
+    }
+
+    /** Перенос vault/app-key/lang из прежнего cache-каталога, один раз. */
+    private fun migrateLegacy(target: File) {
+        val marker = File(target, ".migrated")
+        if (marker.isFile) return
+        val old = System.getProperty("java.io.tmpdir")?.let { File(it, "azraellab") } ?: return
+        if (old.absolutePath == target.absolutePath) {
+            runCatching { marker.createNewFile() }
+            return
+        }
+        for (name in listOf("vault.json", "app-key", "lang")) {
+            val src = File(old, name)
+            val dst = File(target, name)
+            if (src.isFile && !dst.exists()) runCatching { src.copyTo(dst, overwrite = false) }
+        }
+        runCatching { marker.createNewFile() }
     }
 
     private fun file(): File = File(baseDir(), "vault.json")
@@ -172,14 +223,34 @@ actual object AppVault {
     actual fun readAppKey(): String? = runCatching {
         val f = appKeyFile()
         if (!f.isFile) return null
-        f.readText().trim().takeIf { it.isNotBlank() }
+        parseAppKey(f.readText().trim())?.second
     }.getOrNull()
 
-    actual fun writeAppKey(keyB64: String): Boolean = runCatching {
+    // devId, которому принадлежит ключ. null у файла, записанного старой
+    // версией программы (там был только ключ) — такой ключ нельзя переиспользовать.
+    actual fun readAppKeyDevId(): String? = runCatching {
+        val f = appKeyFile()
+        if (!f.isFile) return null
+        parseAppKey(f.readText().trim())?.first
+    }.getOrNull()
+
+    // Формат файла: "devId\nkeyB64". Старый однострочный файл читается как
+    // (null, key) — с пометкой, что маркера нет.
+    private fun parseAppKey(raw: String): Pair<String?, String>? {
+        if (raw.isBlank()) return null
+        val nl = raw.indexOf('\n')
+        if (nl <= 0) return null to raw.trim()
+        val dev = raw.substring(0, nl).trim()
+        val key = raw.substring(nl + 1).trim()
+        if (dev.isEmpty() || key.isEmpty()) return null
+        return dev to key
+    }
+
+    actual fun writeAppKey(devId: String, keyB64: String): Boolean = runCatching {
         val f = appKeyFile()
         val dir = f.parentFile
         if (!dir.exists()) dir.mkdirs()
-        f.writeText(keyB64.trim())
+        f.writeText("$devId\n${keyB64.trim()}")
         true
     }.getOrDefault(false)
 }

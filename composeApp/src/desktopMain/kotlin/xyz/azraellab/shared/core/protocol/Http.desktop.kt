@@ -15,7 +15,34 @@ private fun openOnce(url: String, timeoutMs: Int): HttpURLConnection =
         connectTimeout = timeoutMs
         readTimeout = timeoutMs
         setRequestProperty("Connection", "close")
+        // Редиректы не следуем: подпись привязана к телу и полям конверта,
+        // а ответ, полученный с другого хоста, доверия не заслуживает.
+        instanceFollowRedirects = false
     }
+
+/** Потолок ответа: подпись проверяется целиком, а мусорный/huge-body нам не нужен. */
+private const val MAX_RESPONSE_BYTES = 1 shl 20
+
+/** Читает тело с жёстким потолком, чтобы «ответ на 2 ГБ» не съел память. */
+private fun readLimited(conn: HttpURLConnection): String? = runCatching {
+    val declared = conn.contentLengthLong
+    if (declared > MAX_RESPONSE_BYTES) return@runCatching null
+    val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+        ?: return@runCatching ""
+    stream.use { input ->
+        val buf = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(8 * 1024)
+        var total = 0
+        while (true) {
+            val n = input.read(chunk)
+            if (n < 0) break
+            total += n
+            if (total > MAX_RESPONSE_BYTES) return@runCatching null
+            buf.write(chunk, 0, n)
+        }
+        String(buf.toByteArray(), Charsets.UTF_8)
+    }
+}.getOrNull()
 
 // HTTP POST на JVM (desktop): стандартный HttpURLConnection, ответ читается как UTF-8.
 actual fun httpPostJson(url: String, body: String, timeoutMs: Int): String? = try {
@@ -25,8 +52,7 @@ actual fun httpPostJson(url: String, body: String, timeoutMs: Int): String? = tr
     conn.doOutput = true
     conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
     val code = conn.responseCode
-    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-    val text = stream?.use { String(it.readBytes(), Charsets.UTF_8) }.orEmpty()
+    val text = readLimited(conn)
     conn.disconnect()
     if (code in 200..299) text else null
 } catch (e: Exception) {
@@ -39,8 +65,7 @@ actual fun httpGetJson(url: String, timeoutMs: Int): String? = try {
     conn.requestMethod = "GET"
     conn.setRequestProperty("Accept", "application/json")
     val code = conn.responseCode
-    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-    val text = stream?.use { String(it.readBytes(), Charsets.UTF_8) }.orEmpty()
+    val text = readLimited(conn)
     conn.disconnect()
     if (code in 200..299) text else null
 } catch (e: Exception) {
@@ -60,8 +85,7 @@ actual fun httpPostJsonWithHeaders(url: String, body: String, headers: Map<Strin
     conn.headerFields.forEach { (name, values) ->
         if (name != null && values.isNotEmpty()) map[name.lowercase()] = values[0]
     }
-    val stream = if (status in 200..299) conn.inputStream else conn.errorStream
-    val text = stream?.use { String(it.readBytes(), Charsets.UTF_8) }.orEmpty()
+    val text = readLimited(conn)
     conn.disconnect()
     HttpResult(text, status, map)
 } catch (e: Exception) {
