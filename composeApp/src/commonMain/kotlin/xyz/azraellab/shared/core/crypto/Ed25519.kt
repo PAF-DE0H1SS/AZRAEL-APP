@@ -52,24 +52,68 @@ internal object Ed25519 {
 
     private val IDENTITY = Point(Fe25519.zero(), Fe25519.one(), Fe25519.one(), Fe25519.zero())
 
+    /**
+     * Таблица `2^i · B` для базовой точки: [BASE] и она сама неизменны, поэтому
+     * все 256 промежуточных пунктов считаются один раз за жизнь процесса.
+     *
+     * Обычный «удвоение и прибавление» делает 256 удвоений плюс сложения — 384
+     * операции с точками по 9 полевых умножений, и это на каждый запрос к API.
+     * С таблицей удвоений нет вовсе, а сложений в среднем 128 (столько битов
+     * установлено в случайном `r`) — примерно втрое меньше работы. Сборка
+     * таблицы — 255 удвоений один раз, около 20 мс, лениво при первом
+     * использовании; [lazy] по умолчанию синхронизирован, а после сборки
+     * таблица только читается, поэтому конкурентные подписи её не портят.
+     */
+    private val BASE_TABLE: Array<Point> by lazy {
+        val table = Array<Point>(BITS) { IDENTITY }
+        table[0] = BASE
+        val ws = Fe25519.newWorkspace()
+        for (i in 1 until BITS) table[i] = add(table[i - 1], table[i - 1], ws)
+        table
+    }
+
+    /** Скаляр в 256 бит — ровно столько пунктов в [BASE_TABLE]. */
+    private const val BITS = 256
+
     /** Публичный ключ (raw-32) из 32-байтового seed приватного ключа. */
     fun publicKeyFromSeed(seed: ByteArray): ByteArray {
         require(seed.size == 32) { "ed25519 seed must be 32 bytes, got ${seed.size}" }
         val h = Sha512.digest(seed)
         val a = clampScalar(h.copyOfRange(0, 32))
-        return encodePoint(scalarMultiply(a, BASE))
+        val ws = Fe25519.newWorkspace()
+        // Здесь намеренно обычное умножение «удвоением и прибавлением», а не
+        // [scalarMultiplyBase]: вызывается один раз за ключ, и независимый путь
+        // служит перекрёстной проверкой таблицы в кросс-тестах против JCA.
+        return encodePoint(scalarMultiply(a, BASE, ws), ws)
     }
 
     /** Подпись (64 байта: R||S) сообщения [message] seed-ом [seed]. */
-    fun sign(seed: ByteArray, message: ByteArray): ByteArray {
+    fun sign(seed: ByteArray, message: ByteArray): ByteArray =
+        signWithPublicKey(seed, publicKeyFromSeed(seed), message)
+
+    /**
+     * Подпись с уже вычисленным публичным ключом [publicKey].
+     *
+     * [publicKey] обязан быть ровно `publicKeyFromSeed(seed)` — по RFC 8032 он
+     * зависит только от seed, поэтому вызывающая сторона (у неё ключи установки
+     * уже лежат в хранилище) может передать его повторно и не платить за второе
+     * умножение на базовую точку. Ошибка здесь дала бы подпись, которую сервер
+     * отвергнет, а не «слабую» подпись: приватный ключ в вычислении `S` тот же.
+     */
+    fun signWithPublicKey(seed: ByteArray, publicKey: ByteArray, message: ByteArray): ByteArray {
         require(seed.size == 32) { "ed25519 seed must be 32 bytes, got ${seed.size}" }
+        require(publicKey.size == 32) { "ed25519 public key must be 32 bytes, got ${publicKey.size}" }
         val h = Sha512.digest(seed)
         val a = clampScalar(h.copyOfRange(0, 32))
         val prefix = h.copyOfRange(32, 64)
 
-        val publicKey = encodePoint(scalarMultiply(a, BASE))
+        // Буферы полевой арифметики — на одну операцию подписи, а не на весь
+        // объект: `Ed25519` singleton используется конкурентно из корутин, и
+        // общий изменяемый scratch здесь означал бы гонку между подписями.
+        val ws = Fe25519.newWorkspace()
+
         val r = Fe25519.modL(Fe25519.fromLeWide(Sha512.digest(concatBytes(prefix, message))))
-        val rEncoded = encodePoint(scalarMultiply(r, BASE))
+        val rEncoded = encodePoint(scalarMultiplyBase(r, ws), ws)
 
         val k = Fe25519.modL(
             Fe25519.fromLeWide(Sha512.digest(concatBytes(rEncoded, publicKey, message)))
@@ -92,12 +136,34 @@ internal object Ed25519 {
         return Fe25519.fromLe(a)
     }
 
-    private fun scalarMultiply(scalar: IntArray, point: Point): Point {
+    private fun scalarMultiply(scalar: IntArray, point: Point, ws: Fe25519.Workspace): Point {
         var result = IDENTITY
         for (i in Fe25519.LIMBS - 1 downTo 0) {
             for (bit in 15 downTo 0) {
-                result = add(result, result)
-                if (((scalar[i] ushr bit) and 1) != 0) result = add(result, point)
+                result = add(result, result, ws)
+                if (((scalar[i] ushr bit) and 1) != 0) result = add(result, point, ws)
+            }
+        }
+        return result
+    }
+
+    /**
+     * Умножение на базовую точку через предвычисленную [BASE_TABLE]: складываем
+     * только пункты `2^i · B` для установленных битов скаляра, без удвоений.
+     * Первый найденный пункт становится результатом сразу — складывать его с
+     * единицей не нужно. [Point] неизменяемы, поэтому пункты таблицы можно
+     * отдавать наружу и переиспользовать.
+     */
+    private fun scalarMultiplyBase(scalar: IntArray, ws: Fe25519.Workspace): Point {
+        val table = BASE_TABLE
+        var result = IDENTITY
+        var started = false
+        for (i in 0 until Fe25519.LIMBS) {
+            for (bit in 0 until 16) {
+                if (((scalar[i] ushr bit) and 1) == 0) continue
+                val point = table[i * 16 + bit]
+                result = if (started) add(result, point, ws) else point
+                started = true
             }
         }
         return result
@@ -107,28 +173,28 @@ internal object Ed25519 {
      * Сложение в расширенных координатах twisted Edwards (a = -1).
      * Формула полная: корректна и для P + P, поэтому удвоение идёт через неё же.
      */
-    private fun add(p: Point, q: Point): Point {
-        val a = Fe25519.mul(Fe25519.sub(p.y, p.x), Fe25519.sub(q.y, q.x))
-        val b = Fe25519.mul(Fe25519.add(p.y, p.x), Fe25519.add(q.y, q.x))
-        val c = Fe25519.mul(Fe25519.mul(p.t, D2), q.t)
-        val d = Fe25519.mul(Fe25519.add(p.z, p.z), q.z)
+    private fun add(p: Point, q: Point, ws: Fe25519.Workspace): Point {
+        val a = Fe25519.mul(ws, Fe25519.sub(p.y, p.x), Fe25519.sub(q.y, q.x))
+        val b = Fe25519.mul(ws, Fe25519.add(p.y, p.x), Fe25519.add(q.y, q.x))
+        val c = Fe25519.mul(ws, Fe25519.mul(ws, p.t, D2), q.t)
+        val d = Fe25519.mul(ws, Fe25519.add(p.z, p.z), q.z)
         val e = Fe25519.sub(b, a)
         val f = Fe25519.sub(d, c)
         val g = Fe25519.add(d, c)
         val h = Fe25519.add(b, a)
         return Point(
-            x = Fe25519.mul(e, f),
-            y = Fe25519.mul(g, h),
-            t = Fe25519.mul(e, h),
-            z = Fe25519.mul(f, g)
+            x = Fe25519.mul(ws, e, f),
+            y = Fe25519.mul(ws, g, h),
+            t = Fe25519.mul(ws, e, h),
+            z = Fe25519.mul(ws, f, g)
         )
     }
 
     /** Сжатая точка: 32 байта little-endian из y, старший бит хранит знак x. */
-    private fun encodePoint(point: Point): ByteArray {
-        val zInv = Fe25519.invert(point.z)
-        val x = Fe25519.mul(point.x, zInv)
-        val y = Fe25519.mul(point.y, zInv)
+    private fun encodePoint(point: Point, ws: Fe25519.Workspace): ByteArray {
+        val zInv = Fe25519.invert(ws, point.z)
+        val x = Fe25519.mul(ws, point.x, zInv)
+        val y = Fe25519.mul(ws, point.y, zInv)
         val out = Fe25519.toLe(y, 32)
         if (Fe25519.isOdd(x)) out[31] = (out[31].toInt() or 0x80).toByte()
         return out

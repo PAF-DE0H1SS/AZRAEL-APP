@@ -91,9 +91,23 @@ internal object Fe25519 {
 
     fun neg(a: IntArray): IntArray = subMod(zero(), a, P)
 
-    fun mul(a: IntArray, b: IntArray): IntArray = reduce(mulWide(a, b))
+    fun mul(a: IntArray, b: IntArray): IntArray = mul(newWorkspace(), a, b)
+
+    /**
+     * Умножение с переиспользованием буферов [ws]. Возвращает новый массив,
+     * входы [a] и [b] не изменяются — поэтому результат можно свободно держать
+     * дальше, переиспользуя [ws] под следующие промежуточные значения.
+     */
+    fun mul(ws: Workspace, a: IntArray, b: IntArray): IntArray {
+        mulWideInto(ws, a, b)
+        val out = IntArray(LIMBS)
+        reduceInto(ws, out)
+        return out
+    }
 
     fun invert(a: IntArray): IntArray = pow(a, P_MINUS_2)
+
+    fun invert(ws: Workspace, a: IntArray): IntArray = pow(ws, a, P_MINUS_2)
 
     fun isZero(a: IntArray): Boolean {
         for (i in 0 until LIMBS) if (a[i] != 0) return false
@@ -138,99 +152,139 @@ internal object Fe25519 {
 
     // ------------------------------------------------------------------- внутреннее
 
-    /** Школьное умножение 16x16 лимбов в 32 лимба, без приведения. */
-    fun mulWide(a: IntArray, b: IntArray): IntArray {
-        val prod = LongArray(WIDE)
+    /**
+     * Буферы горячего пути. Создаётся один раз на операцию верхнего уровня
+     * (`Ed25519.publicKeyFromSeed`/`sign`) и переиспользуется, поэтому умножение
+     * в поле не аллоцирует ничего, кроме возвращаемого результата.
+     *
+     * Общего изменяемого состояния здесь намеренно нет: буферы принадлежат
+     * объекту, который создаёт вызывающий, поэтому две одновременные подписи из
+     * разных корутин не затирают друг другу промежуточные значения. Менять
+     * `wide`/`acc` местами можно только внутри [foldOnce].
+     */
+    class Workspace {
+        internal var wide = IntArray(WIDE)
+        internal var acc = IntArray(WIDE)
+    }
+
+    fun newWorkspace(): Workspace = Workspace()
+
+    /** Школьное умножение 16x16 лимбов в 32 лимба, без приведения, в буфер [ws]. */
+    fun mulWideInto(ws: Workspace, a: IntArray, b: IntArray) {
+        val prod = ws.wide
+        for (i in 0 until WIDE) prod[i] = 0
         for (i in 0 until LIMBS) {
             if (a[i] == 0) continue
             val ai = a[i].toLong()
             var carry = 0L
             for (j in 0 until LIMBS) {
                 val v = prod[i + j] + ai * b[j] + carry
-                prod[i + j] = v and 0xFFFFL
+                prod[i + j] = (v and 0xFFFFL).toInt()
                 carry = v ushr 16
             }
             var k = i + LIMBS
             while (carry != 0L) {
                 val v = prod[k] + carry
-                prod[k] = v and 0xFFFFL
+                prod[k] = (v and 0xFFFFL).toInt()
                 carry = v ushr 16
                 k++
             }
         }
-        return IntArray(WIDE) { prod[it].toInt() }
     }
 
-    /** 32 лимба → канонический остаток по модулю p. */
-    fun reduce(x: IntArray): IntArray {
-        val t = IntArray(WIDE)
-        for (i in 0 until WIDE) t[i] = x[i]
+    /** Школьное умножение в свежий массив — для холодных путей и тестов. */
+    fun mulWide(a: IntArray, b: IntArray): IntArray {
+        val ws = newWorkspace()
+        mulWideInto(ws, a, b)
+        return ws.wide.copyOf()
+    }
+
+    /** 32 лимба из буфера [ws] → канонический остаток по модулю p в [out]. */
+    fun reduceInto(ws: Workspace, out: IntArray) {
         // 2^255 ≡ 19 (mod p): чем короче «хвост» старших битов, тем меньше он
         // становится. Трёх свёрток достаточно, чтобы получить < 2^255 + 19,
         // после чего одного условного вычитания p хватает (p = 2^255 - 19).
-        fold(t)
-        fold(t)
-        fold(t)
-        // `less`/`subtractInPlace`/`copyOf` смотрят только на LIMBS лимбов, поэтому
-        // выше лимба LIMBS-1 должно быть строго пусто — иначе остаток уехал бы в
+        foldOnce(ws)
+        foldOnce(ws)
+        foldOnce(ws)
+        // `less`/`subtractInPlace` смотрят только на LIMBS лимбов, поэтому выше
+        // лимба LIMBS-1 должно быть строго пусто — иначе остаток уехал бы в
         // p-редьюкшен, а его старшие биты молча отбросились бы.
-        check(t[LIMBS] == 0 && t[LIMBS + 1] == 0) { "reduce: значение не влезло в 255 бит" }
-        if (!less(t, P)) subtractInPlace(t, P)
-        return t.copyOf(LIMBS)
+        check(ws.wide[LIMBS] == 0 && ws.wide[LIMBS + 1] == 0) { "reduce: значение не влезло в 255 бит" }
+        if (!less(ws.wide, P)) subtractInPlace(ws.wide, P)
+        for (i in 0 until LIMBS) out[i] = ws.wide[i]
+    }
+
+    /** Канонический остаток 32 лимбов по модулю p — для холодных путей и тестов. */
+    fun reduce(x: IntArray): IntArray {
+        val ws = newWorkspace()
+        for (i in 0 until WIDE) ws.wide[i] = x[i]
+        val out = IntArray(LIMBS)
+        reduceInto(ws, out)
+        return out
     }
 
     /**
      * t = (t mod 2^255) + 19 * (t div 2^255) — свёртка по 2^255 ≡ 19 (mod p).
      *
-     * `t` читается как [WIDE] лимбов, результат кладётся в те же первые [WORK]
-     * лимбов, хвост обнуляется. Собирать в отдельный массив важно: старые биты
-     * и результат складываются в одном проходе, и перезапись «на месте» затирала
-     * бы младшие 255 бит. Каждая свёртка срезает хвост почти целиком, поэтому
-     * перенос за [WORK] лимбов невозможен.
+     * Пишет результат в `ws.acc` и меняет буферы местами, так что после вызова
+     * свёрнутое значение всегда в `ws.wide`. Отдельный аккумулятор обязателен:
+     * младшие 255 бит и результат складываются в одном проходе, и перезапись
+     * «на месте» затирала бы старые биты раньше, чем они прочитаны. Каждая
+     * свёртка срезает хвост почти целиком, поэтому перенос за [WORK] лимбов
+     * невозможен.
      */
-    private fun fold(t: IntArray) {
-        val acc = IntArray(WORK)
+    private fun foldOnce(ws: Workspace) {
+        val src = ws.wide
+        val dst = ws.acc
         // Младшие 255 бит — это ровно LIMBS лимбов с обрезанным старшим битом.
-        // Лимбы LIMBS и выше — это уже «хвост» (t div 2^255), их в acc не берём.
-        for (i in 0 until LIMBS) acc[i] = t[i]
-        acc[LIMBS - 1] = acc[LIMBS - 1] and 0x7FFF
-
+        // Лимбы LIMBS и выше — это уже «хвост» (t div 2^255), их в сумму не берём.
         // Лимб i числа t div 2^255 = (t[LIMBS-1+i] >> 15) | (t[LIMBS+i] & 0x7FFF) << 1,
         // потому что 255 = 16 * 15 + 15: бит 255 — старший бит лимба 15.
         var carry = 0L
         for (i in 0 until WORK) {
-            val cur = if (i + LIMBS - 1 < WIDE) t[i + LIMBS - 1] else 0
-            val nxt = if (i + LIMBS < WIDE) t[i + LIMBS] else 0
+            val cur = if (i + LIMBS - 1 < WIDE) src[i + LIMBS - 1] else 0
+            val nxt = if (i + LIMBS < WIDE) src[i + LIMBS] else 0
             val hi = ((cur ushr 15) and 1) or ((nxt and 0x7FFF) shl 1)
-            val v = acc[i].toLong() + hi.toLong() * 19 + carry
-            acc[i] = (v and 0xFFFFL).toInt()
+            val low = if (i < LIMBS) {
+                if (i == LIMBS - 1) src[i] and 0x7FFF else src[i]
+            } else 0
+            val v = low.toLong() + hi.toLong() * 19L + carry
+            dst[i] = (v and 0xFFFFL).toInt()
             carry = v ushr 16
         }
         var c = carry
         for (i in 0 until WORK) {
-            val v = acc[i].toLong() + c
-            acc[i] = (v and 0xFFFFL).toInt()
+            val v = dst[i].toLong() + c
+            dst[i] = (v and 0xFFFFL).toInt()
             c = v ushr 16
         }
         check(c == 0L) { "fold: перенос за пределы буфера" }
-        for (i in 0 until WIDE) t[i] = if (i < WORK) acc[i] else 0
+        for (i in WORK until WIDE) dst[i] = 0
+        ws.wide = dst
+        ws.acc = src
     }
 
+    /**
+     * Сумма по модулю [m]. Перенос держим в переменной, а не в 17-м лимбе: если
+     * a, b < m, то a + b < 2m, поэтому одного условного вычитания [m] всегда
+     * достаточно, а результат гарантированно меньше m и помещается в [LIMBS]
+     * лимбов. Поэтому одного массива хватает — без промежуточного WORK и копии.
+     */
     private fun addMod(a: IntArray, b: IntArray, m: IntArray): IntArray {
-        val t = IntArray(WORK)
+        val t = IntArray(LIMBS)
         var carry = 0
         for (i in 0 until LIMBS) {
             val s = a[i] + b[i] + carry
             t[i] = s and 0xFFFF
             carry = s ushr 16
         }
-        t[LIMBS] = carry
         if (carry != 0 || !less(t, m)) subtractInPlace(t, m)
-        return t.copyOf(LIMBS)
+        return t
     }
 
     private fun subMod(a: IntArray, b: IntArray, m: IntArray): IntArray {
-        val t = IntArray(WORK)
+        val t = IntArray(LIMBS)
         var borrow = 0
         for (i in 0 until LIMBS) {
             val d = a[i] - b[i] - borrow
@@ -245,7 +299,7 @@ internal object Fe25519 {
                 carry = s ushr 16
             }
         }
-        return t.copyOf(LIMBS)
+        return t
     }
 
     private fun subtractInPlace(t: IntArray, m: IntArray) {
@@ -266,12 +320,14 @@ internal object Fe25519 {
     }
 
     /** Возведение в степень по основанию 2, старшие биты первыми. */
-    fun pow(base: IntArray, exp: IntArray): IntArray {
+    fun pow(base: IntArray, exp: IntArray): IntArray = pow(newWorkspace(), base, exp)
+
+    fun pow(ws: Workspace, base: IntArray, exp: IntArray): IntArray {
         var result = one()
         for (i in LIMBS - 1 downTo 0) {
             for (bit in 15 downTo 0) {
-                result = mul(result, result)
-                if (((exp[i] ushr bit) and 1) != 0) result = mul(result, base)
+                result = mul(ws, result, result)
+                if (((exp[i] ushr bit) and 1) != 0) result = mul(ws, result, base)
             }
         }
         return result

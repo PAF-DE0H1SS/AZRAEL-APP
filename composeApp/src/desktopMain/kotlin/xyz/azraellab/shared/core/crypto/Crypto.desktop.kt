@@ -85,8 +85,9 @@ actual object Crypto {
         return KeyPairData(publicKey = Ed25519.publicKeyFromSeed(s), privateKey = s.copyOf())
     }
 
-    actual fun ed25519Sign(privKey: ByteArray, message: ByteArray): ByteArray =
-        Ed25519.sign(privKey, message)
+    actual fun ed25519Sign(privKey: ByteArray, message: ByteArray, publicKey: ByteArray?): ByteArray =
+        if (publicKey == null) Ed25519.sign(privKey, message)
+        else Ed25519.signWithPublicKey(privKey, publicKey, message)
 
     actual fun hkdfSha256(ikm: ByteArray, salt: ByteArray, info: ByteArray, length: Int): ByteArray = try {
         // Extract: PRK = HMAC-SHA256(salt, IKM); короткая соль до-заполняется нулями.

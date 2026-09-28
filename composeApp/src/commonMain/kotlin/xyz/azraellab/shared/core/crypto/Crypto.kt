@@ -26,8 +26,15 @@ expect object Crypto {
     /** Ed25519 keypair; публичный и приватный ключи — raw-32 (как в device API сервера). */
     fun ed25519KeyPair(seed: ByteArray? = null): KeyPairData
 
-    /** Ed25519-подпись raw-32 приватным ключом; возвращает 64 байта. */
-    fun ed25519Sign(privKey: ByteArray, message: ByteArray): ByteArray
+    /**
+     * Ed25519-подпись raw-32 приватным ключом; возвращает 64 байта.
+     *
+     * [publicKey] — тот же raw-32 публичный ключ, что и у [privKey], если он у
+     * вызывающего уже есть: он зависит только от seed, поэтому передача
+     * экономит одно умножение на базовую точку (экономятся миллисекунды на
+     * каждом подписанном запросе). `null` — вычислить заново.
+     */
+    fun ed25519Sign(privKey: ByteArray, message: ByteArray, publicKey: ByteArray? = null): ByteArray
 
     /** X25519 keypair в raw-32 (публичный и приватный) — для L2 эфемерного ключа. */
     fun x25519KeyPairRaw(seed: ByteArray? = null): KeyPairData

@@ -170,4 +170,62 @@ class Ed25519Test {
         assertContentEquals(Ed25519.sign(seed, msg), Crypto.ed25519Sign(seed, msg))
         assertTrue(jcaVerify(kp.publicKey, msg, Crypto.ed25519Sign(seed, msg)))
     }
+
+    /**
+     * Путь с уже известным публичным ключом обязан быть байт-в-байт равен
+     * полному `sign` — на этом строится экономия одного умножения на базовую
+     * точку в `AppClient.deviceHeaders` (ключи установки уже лежат в vault).
+     */
+    @Test
+    fun signWithKnownPublicKeyMatchesFullSign() {
+        val rnd = Random(19)
+        repeat(64) {
+            val seed = ByteArray(32).also { r -> rnd.nextBytes(r) }
+            val msg = ByteArray(rnd.nextInt(1, 200)).also { r -> rnd.nextBytes(r) }
+            val pub = Ed25519.publicKeyFromSeed(seed)
+
+            assertContentEquals(Ed25519.sign(seed, msg), Ed25519.signWithPublicKey(seed, pub, msg))
+            assertContentEquals(
+                Crypto.ed25519Sign(seed, msg),
+                Crypto.ed25519Sign(seed, msg, pub)
+            )
+            // Подпись обязана проверяться настоящим JCA-верификатором, а не только
+            // совпадать с эталоном: это ловит ошибку в самой формуле.
+            assertTrue(jcaVerify(pub, msg, Ed25519.signWithPublicKey(seed, pub, msg)))
+        }
+    }
+
+    /**
+     * `Ed25519` — singleton, а `AppClient` подписывает из корутин, поэтому
+     * ленивая `BASE_TABLE` и per-call workspace должны выдерживать гонку: таблица
+     * строится один раз и дальше только читается. Считаем подписи в потоках и
+     * сверяем с однопоточным эталоном — расхождение означало бы гонку.
+     */
+    @Test
+    fun concurrentSigningMatchesSingleThreaded() {
+        val rnd = Random(23)
+        val n = 32
+        val seeds = Array(n) { ByteArray(32).also { r -> rnd.nextBytes(r) } }
+        val msgs = Array(n) { ByteArray(rnd.nextInt(1, 300)).also { r -> rnd.nextBytes(r) } }
+
+        // Эталон считаем до запуска потоков: к моменту старта таблица уже собрана,
+        // а проверяем именно параллельные обращения к ней и к workspace.
+        val expected = Array(n) { Ed25519.sign(seeds[it], msgs[it]) }
+
+        val actual = arrayOfNulls<ByteArray>(n)
+        val errors = arrayOfNulls<Throwable>(n)
+        val threads = (0 until n).map { i ->
+            Thread {
+                try {
+                    actual[i] = Ed25519.sign(seeds[i], msgs[i])
+                } catch (t: Throwable) {
+                    errors[i] = t
+                }
+            }.apply { start() }
+        }
+        threads.forEach { it.join() }
+
+        errors.forEach { require(it == null) { "concurrent sign failed: $it" } }
+        for (i in 0 until n) assertContentEquals(expected[i], actual[i], "seed #$i")
+    }
 }

@@ -524,7 +524,10 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         val kp = device ?: return emptyMap()
         val tsStr = ts.toString()
         val msg = "AZRAEL-DEV|$tsStr|$nonce|${Hex.toHex(Crypto.sha256(body.toByteArray(Charsets.UTF_8)))}"
-        val sig = Crypto.ed25519Sign(kp.priv, msg.toByteArray(Charsets.UTF_8))
+        // Публичный ключ установки уже лежит в [DeviceKeys], а он зависит только
+        // от seed — передаём его, чтобы не платить за лишнее умножение на базовую
+        // точку на каждом запросе.
+        val sig = Crypto.ed25519Sign(kp.priv, msg.toByteArray(Charsets.UTF_8), kp.pub)
         return mapOf(
             AppSecure.HDR_DEV to kp.devId,
             AppSecure.HDR_DEV_TS to tsStr,
