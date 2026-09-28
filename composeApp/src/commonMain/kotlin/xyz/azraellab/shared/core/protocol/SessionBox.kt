@@ -16,8 +16,15 @@ class SessionBox {
 
     val hasSession: Boolean get() = sessionToken.isNotEmpty() && serverPublicKey != null
 
-    fun startHandshake(): Envelope {
-        val payloadJson = """{"eph_pub":"${b64(keyPair.publicKey)}"}"""
+    /**
+     * Собирает конверт рукопожатия. Необязательное поле `auth` — site-сессия:
+     * если она валидна, сервер повышает роль канала (guest → standard/admin)
+     * и отдаёт её в ответе init.
+     */
+    fun startHandshake(auth: String? = null): Envelope {
+        val eph = b64(keyPair.publicKey)
+        val payloadJson = if (auth.isNullOrBlank()) """{"eph_pub":"$eph"}"""
+        else """{"eph_pub":"$eph","auth":"${auth.replace("\"", "\\\"")}"}"""
         return Envelope(
             id = newId(),
             ts = nowSec(),
@@ -29,9 +36,18 @@ class SessionBox {
 
     fun acceptServer(serverPubB64: String, token: String): Boolean {
         if (serverPubB64.isEmpty() || token.isEmpty()) return false
-        serverPublicKey = try {
+        if (token.length > 512) return false
+        val raw = try {
             Base64Codec.decode(serverPubB64)
         } catch (e: Exception) { return false }
+        // Сервер шлёт SPKI-DER (44 байта); X25519 нужен raw-32 (хвост ключа).
+        val pub = if (raw.size > 32) raw.copyOfRange(raw.size - 32, raw.size) else raw
+        // Принимаем только raw-32: иначе мусорный публичный ключ уходит в ECDH
+        // и ошибка всплывает позже, внутри seal(), в невнятном виде.
+        if (pub.size != 32) return false
+        // All-zero публичный ключ X25519 даёт нулевой shared secret (RFC 7748).
+        if (pub.all { it == 0.toByte() }) return false
+        serverPublicKey = pub
         sessionToken = token
         return true
     }
@@ -41,7 +57,10 @@ class SessionBox {
     fun seal(op: String, plainBody: ByteArray): Envelope? {
         val serverPub = serverPublicKey ?: return null
         if (!hasSession) return null
-        val shared = Crypto.sharedSecret(keyPair.privateKey, serverPub)
+        // Крипто-примитивы бросают исключения на некорректном вводе; наружу
+        // должен уходить null, а не падение на потоке вызова.
+        val shared = runCatching { Crypto.sharedSecret(keyPair.privateKey, serverPub) }.getOrNull() ?: return null
+        if (shared.isEmpty() || shared.all { it == 0.toByte() }) return null
         val nonce = randomBytes(12)
         val id = newId()
         val ts = nowSec()
@@ -60,7 +79,8 @@ class SessionBox {
     // Расшифровка ответа сервера: тот же детерминированный AAD из полей конверта.
     fun open(env: Envelope): ByteArray? {
         val serverPub = serverPublicKey ?: return null
-        val shared = Crypto.sharedSecret(keyPair.privateKey, serverPub)
+        val shared = runCatching { Crypto.sharedSecret(keyPair.privateKey, serverPub) }.getOrNull() ?: return null
+        if (shared.isEmpty() || shared.all { it == 0.toByte() }) return null
         val cipher = try { Base64Codec.decode(env.payload) } catch (e: Exception) { return null }
         val nonce = try { Base64Codec.decode(env.nonce) } catch (e: Exception) { return null }
         val aad = aad(env.op, env.id, env.ts)

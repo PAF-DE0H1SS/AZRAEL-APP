@@ -1,3 +1,147 @@
 package xyz.azraellab.shared
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.ImageBitmap
+import xyz.azraellab.shared.core.crypto.Crypto
+
 expect fun platformName(): String
+
+/** Выбранный пользователем файл (для вложений и аватара). */
+data class PickedFile(val name: String, val mime: String, val base64: String)
+
+/** Итог системного диалога выбора файла. */
+sealed interface FilePick {
+    /** Файл выбран и прочитан. */
+    data class Picked(val file: PickedFile) : FilePick
+
+    /** Пользователь закрыл диалог — это не ошибка, сообщать не о чем. */
+    data object Cancelled : FilePick
+
+    /** Диалога на платформе нет либо файл не прочитался (битый, больше maxBytes). */
+    data object Unavailable : FilePick
+}
+
+/**
+ * Системный диалог выбора файла. Возвращает запускатор, который нужно вызвать
+ * из обработчика клика; mimeTypes — фильтр (для аватара «image/» + звёздочка, для
+ * вложений «*» + /«*» — любой файл), maxBytes — лимит размера. Сам диалог открывается
+ * системой, чтение файла — в IO, результат приходит в onResult в главном потоке.
+ */
+@Composable
+expect fun rememberFilePicker(
+    mimeTypes: List<String>,
+    maxBytes: Long,
+    onResult: (FilePick) -> Unit
+): () -> Unit
+
+/** Декод base64-картинки (data:image/png;base64,…) в ImageBitmap; null при ошибке. */
+expect fun decodeImageBase64(data: String): ImageBitmap?
+
+/**
+ * «Могила» (tombstone) устройства — режим защиты при отзыве/скомпрометированном канале.
+ *
+ * Принцип: обычный флаг («не давать работать») обязан переживать переустановку и
+ * не заметаться приложением вручную, поэтому пишется НЕ в данные программы, а во
+ * «внешнюю» точку (root-каталоги/блокировщик системы на десктопе; медиа-/shared-
+ * хранилище на Android). Программа на старте проверяет могилу ДО любого обращения
+ * к сети: если она есть — приложение в режиме защиты, даже офлайн.
+ *
+ * Снять можно ТОЛЬКО с сайта через /admin (x-azrael-release в подписанном ответе).
+ */
+/**
+ * Задать каталог хранения данных установки до первого обращения к [AppVault].
+ *
+ * На Android доступ к `context.filesDir` есть только у Activity, а хранилище
+ * нужно уже в конструкторе клиента. Старый вариант брал `java.io.tmpdir`,
+ * который на Android указывает на cache-каталог: система вправе стереть его при
+ * нехватке места, и вместе с ним терялись ключ установки и app-key — то есть
+ * приложение теряло привязку к аккаунту без всякой вины пользователя.
+ * Кэш для этого не годится: в filesDir система не вмешивается сама, а
+ * правила бэкапа (`backup_rules.xml`) этот каталог исключают.
+ *
+ * На десктопе вызов ничего не делает — там путь свой.
+ */
+expect fun initStorageDir(dir: String)
+
+/** Диагностический лог непойманной ошибки: на Android в logcat, на desktop в stderr. */
+expect fun logAzraelError(tag: String, message: String, error: Throwable?)
+
+expect object AppTrap {
+    /** Стабильный идентификатор устройства (для отзыва через /admin). */
+    fun deviceId(): String
+
+    /** Есть ли «могила» (режим защиты) на этом устройстве. */
+    fun isProtected(): Boolean
+
+    /** Записать «могилу» (максимум точек, какие удастся). Вернёт успех хотя бы одной. */
+    fun installProtection(): Boolean
+
+    /** Снять «могилу» — вызывается ТОЛЬКО по команде с сайта (x-azrael-release). */
+    fun removeProtection(): Unit
+}
+
+/**
+ * Персистентное хранилище данных установки (sealed JSON) — ключь устройства,
+ * его идентификатор и session-токен. Живёт вне каталога программы (переживает
+ * переустановку/перезагрузку, пока это позволяет платформа). Данные защищены
+ * правами файловой системы; встроенного шифрования нет — как и у всех локальных
+ * секретов приложения (токены/ключи только локально, правило проекта).
+ */
+expect object AppVault {
+    /** Прочитать сохранённый blob (null — ещё не было привязки). */
+    fun read(): String?
+
+    /** Сохранить blob (перезаписывает). */
+    fun write(data: String): Boolean
+
+    /**
+     * Ключ канала (/api/app/v1), полученный при первом запуске из открытой
+     * точки /api/app/bootstrap. Пользователь его не вводит и не видит; здесь он
+     * лежит до первой привязки, после чего остаётся тем же файлом при рестартах.
+     * null — ключ ещё не получен (первый запуск без сети).
+     */
+    fun readAppKey(): String?
+
+    /**
+     * К какому devId относится сохранённый ключ канала (см. [readAppKey]).
+     * null — ключ получен старой версией программы, где маркера не было: такой
+     * ключ использовать нельзя, его надо заменить, забрать заново по devId.
+     */
+    fun readAppKeyDevId(): String?
+
+    /**
+     * Сохранить ключ канала (base64) вместе с devId, для которого он получен.
+     * Ключ привязан к установке, поэтому при другом devId он не подходит.
+     */
+    fun writeAppKey(devId: String, keyB64: String): Boolean
+}
+
+/**
+ * Локальное сохранение языка интерфейса (обычный файл, не секрет). Нужно, чтобы
+ * входной экран был переведён до первого обращения к сети, а язык аккаунта
+ * (users.lang) подхватывался на этом же устройстве.
+ */
+expect object AppLangStore {
+    /** Сохранённый код языка (ru/en/zh) или null. */
+    fun read(): String?
+
+    /** Сохранить код языка. */
+    fun write(code: String): Boolean
+}
+
+internal fun stripDataUrl(data: String): String =
+    if (data.startsWith("data:")) data.substringAfter("base64,", "") else data
+
+internal fun digestDeviceId(vararg parts: String): String {
+    val joined = parts.joinToString("|")
+    return Hex.toHex(Crypto.sha256(joined.toByteArray(Charsets.UTF_8)).copyOf(16))
+}
+
+internal object Hex {
+    private const val CHARS = "0123456789abcdef"
+    fun toHex(b: ByteArray): String {
+        val sb = StringBuilder(b.size * 2)
+        for (x in b) { sb.append(CHARS[(x.toInt() ushr 4) and 0xf]); sb.append(CHARS[x.toInt() and 0xf]) }
+        return sb.toString()
+    }
+}

@@ -1,7 +1,5 @@
 package xyz.azraellab.shared.core.crypto
 
-import kotlin.random.Random
-
 expect object Crypto {
 
     /** Генерация X25519 keypair. Пара [seed] опциональна (детерминированные тесты). */
@@ -15,10 +13,53 @@ expect object Crypto {
 
     /** AEAD-decrypt. Возвращает plain|null при неудаче. */
     fun decrypt(key: ByteArray, aad: ByteArray, cipher: ByteArray, nonce: ByteArray): ByteArray?
+
+    /** HMAC-SHA256 для подписи запросов/ответов кастомного API. */
+    fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray
+
+    /** SHA-256 для детерминированного хэша тела (анти-подмена). */
+    fun sha256(data: ByteArray): ByteArray
+
+    /** HKDF-SHA256 (RFC 5869) — зеркалит lib/app-l2.ts (Extract+Expand, L=32). */
+    fun hkdfSha256(ikm: ByteArray, salt: ByteArray, info: ByteArray, length: Int): ByteArray
+
+    /** Ed25519 keypair; публичный и приватный ключи — raw-32 (как в device API сервера). */
+    fun ed25519KeyPair(seed: ByteArray? = null): KeyPairData
+
+    /**
+     * Ed25519-подпись raw-32 приватным ключом; возвращает 64 байта.
+     *
+     * [publicKey] — тот же raw-32 публичный ключ, что и у [privKey], если он у
+     * вызывающего уже есть: он зависит только от seed, поэтому передача
+     * экономит одно умножение на базовую точку (экономятся миллисекунды на
+     * каждом подписанном запросе). `null` — вычислить заново.
+     */
+    fun ed25519Sign(privKey: ByteArray, message: ByteArray, publicKey: ByteArray? = null): ByteArray
+
+    /** X25519 keypair в raw-32 (публичный и приватный) — для L2 эфемерного ключа. */
+    fun x25519KeyPairRaw(seed: ByteArray? = null): KeyPairData
+
+    /** Общий секрет X25519 по raw-32 ключам (RFC 7748 little-endian u-координата). */
+    fun x25519SharedRaw(privKey: ByteArray, pubKey: ByteArray): ByteArray
+
+    /** CSPRNG: криптостойкие байты для nonce, id, session token и ключей. */
+    fun randomBytes(size: Int): ByteArray
 }
 
 data class KeyPairData(val publicKey: ByteArray, val privateKey: ByteArray)
 
-fun randomBytes(size: Int): ByteArray = ByteArray(size).also { b ->
-    Random.Default.nextBytes(b)
+/** Конкатенация байтовых массивов (для HKDF Expand). */
+fun concatBytes(vararg arrays: ByteArray): ByteArray {
+    var size = 0
+    for (a in arrays) size += a.size
+    val out = ByteArray(size)
+    var pos = 0
+    for (a in arrays) {
+        a.copyInto(out, pos)
+        pos += a.size
+    }
+    return out
 }
+
+/** Все случайные значения в клиенте идут через платформенный SecureRandom. */
+fun randomBytes(size: Int): ByteArray = Crypto.randomBytes(size)

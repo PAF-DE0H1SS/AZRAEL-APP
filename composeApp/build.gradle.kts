@@ -26,6 +26,10 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
+        // Раньше androidLibrary и jvm("desktop") пришлось соединять отдельным
+        // jvmCommonMain ради Ed25519 на BigInteger. Теперь крипто — чистый
+        // Kotlin в commonMain (core/crypto/{Ed25519,Fe25519,Sha512}.kt), и
+        // посредник не нужен.
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -40,6 +44,16 @@ kotlin {
         val desktopMain by getting
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
+        }
+        val desktopTest by getting
+        desktopTest.dependencies {
+            implementation(kotlin("test"))
+        }
+    }
+    tasks.withType<Test>().configureEach {
+        testLogging {
+            showStandardStreams = true
+            events("passed", "skipped", "failed")
         }
     }
 }

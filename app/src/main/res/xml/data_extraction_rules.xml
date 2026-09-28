@@ -1,19 +1,27 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Android 12+ (device-to-device и облачный бэкап). include не указываем по той
+   же причине, что в backup_rules.xml: без него работает правило «всё, кроме
+   перечисленного», а exclude обязан лежать внутри include — иначе lint роняет
+   сборку. Данные установки (filesDir/azraellab) исключены и здесь: перенос на
+   другой телефон выглядел бы как «привязанная» установка с уже украденным
+   ключом, а серверская привязка по devId начала бы врать.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="azraellab/" />
+        <exclude domain="file" path=".azraellab/" />
+        <exclude domain="file" path="app-key" />
+        <exclude domain="file" path="vault.json" />
+        <exclude domain="file" path="device.lock" />
+        <exclude domain="sharedpref" path="azraellab_vault.xml" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="azraellab/" />
+        <exclude domain="file" path=".azraellab/" />
+        <exclude domain="file" path="app-key" />
+        <exclude domain="file" path="vault.json" />
+        <exclude domain="file" path="device.lock" />
+        <exclude domain="sharedpref" path="azraellab_vault.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

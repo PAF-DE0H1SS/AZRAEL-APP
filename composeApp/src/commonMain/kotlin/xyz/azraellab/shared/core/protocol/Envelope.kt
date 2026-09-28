@@ -22,6 +22,9 @@ object Protocol {
     const val OP_SESSION_BYE = "session.bye"
     const val OP_STATUS = "status"
     const val OP_HELLO = "hello"
+    const val OP_AI_CHAT = "ai.chat"
+    const val OP_CMD_INFO = "cmd.info"
+    const val OP_CMD_PING = "cmd.ping"
 
     const val ERR_OK = 0
     const val ERR_MALFORMED = 100

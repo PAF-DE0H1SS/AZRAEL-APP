@@ -58,11 +58,21 @@
 
 ## Жизненный цикл сессии
 
-1. `session.init` — клиент шлёт `eph_pub` (SPKI, base64 в JSON, сам JSON закодирован base64 в `payload` — открытым конвертом).
-2. Сервер отвечает `payload = base64(JSON {"srv_pub": <raw32 base64>, "session": <token>})` — тоже открытым (до обмена ключами шифровать нечем). Токен TTL 15 мин.
-3. Дальнейшие `op`-вызовы идут с `session`-токеном и AEAD-шифрованным payload (op/status/hello/session.rotate/session.bye).
+1. `session.init` — клиент шлёт `eph_pub` (SPKI, base64 в JSON, сам JSON закодирован base64 в `payload` — открытым конвертом). Необязательное поле `auth` — site-сессия: если она валидна, сервер повышает роль канала.
+2. Сервер отвечает `payload = base64(JSON {"srv_pub": <raw32 base64>, "session": <token>, "role": <guest|standard|admin>, "user": <username>})` — тоже открытым (до обмена ключами шифровать нечем). Токен TTL 15 мин, роль в нём сохраняется на весь срок сессии.
+3. Дальнейшие `op`-вызовы идут с `session`-токеном и AEAD-шифрованным payload (op/status/hello/session.rotate/session.bye/ai.chat/cmd.*).
 4. `session.rotate` — смена токена без смены ключа (для смены ключа повторяется `session.init`).
 5. `session.bye` — явное завершение (сервер удаляет сессию и отвечает зашифрованным `bye`).
+
+## RBAC (роли и доступ операций)
+
+Роль выдаётся при `session.init` и не меняется до конца сессии (ротация токена её сохраняет):
+
+- `guest` (по умолчанию, без `auth`) — `session.init/bye/rotate`, `status`, `hello`.
+- `standard` (валидная site-сессия обычного пользователя) — всё у `guest` + `ai.chat`.
+- `admin` (валидная site-сессия owner/admin) — всё у `standard` + `cmd.*` (`cmd.ping`, `cmd.info`).
+
+Попытка вызова сверх роли даёт `err=108` (HTTP 403). Ответы `status`/`hello` содержат поле `role`, чтобы клиент видел свои права.
 
 ## Пример handshake (actual)
 
@@ -70,7 +80,8 @@
 C → S:  POST /gateway/v1  {"v":1,"op":"session.init","id":"…","ts":…,
                            "payload": b64(JSON {"eph_pub": b64(SPKI_DER)})}
 S → C:  {"v":1,"op":"session.init","ts":…,"session":<token>,
-          "payload": b64(JSON {"srv_pub": b64(raw32), "session": <token>}), "err":0}
+          "payload": b64(JSON {"srv_pub": b64(raw32), "session": <token>,
+                               "role": "guest", "user": ""}), "err":0}
 C:      shared = X25519(clientPriv, srv_pub_raw32)   // 32 байта = ключ AES-256
 C → S:  {"v":1,"op":"status","id":"…","ts":…,"session":token,
           "payload": b64(ct||authTag), "nonce": b64(12B),
@@ -116,7 +127,7 @@ S → C:  {"v":1,"op":"status","id":"…","ts":…,"session":token,
 - `ts` клиента должно отличаться от времени сервера не более чем на ±120 с (настраивается).
 - Каждый `id` принимается один раз (скользящее окно на Redis/слой шлюза).
 - Rate-limit: N запросов/мин на сессию и на IP (настраивается).
-- RBAC: каждая операция требует роль (read/command/admin); сервер ведёт полный аудит.
+- RBAC: каждая операция требует роль (guest/standard/admin); отказ = код 108.
 - Полезные данные не логируются. Логируются только метаданные конверта (без payload/nonce).
 
 ## Пример handshake (упрощённо)
