@@ -5,6 +5,9 @@
     <!-- Обязательное для выдачи ключа канала и всех обращений к /api/app.
          Без него HttpURLConnection падает SecurityException ещё до DNS. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Офлайн-индикатор: без него ConnectivityManager.activeNetwork всегда null,
+         и баннер «нет подключения» не показывался бы никогда. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"
@@ -18,12 +21,31 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Deep link: azrael://messages/42 открывает комнату чата 42.
+                 autoVerify не ставим — домен azrael-lab.xyz закрыт Badger'ом Pangolin
+                 и assetlinks.json там недоступен, Android всё равно не смог бы
+                 подтвердить домен и показал бы выбор приложения.
+
+                 launchMode="singleTask" (см. выше) — условие доставки ссылки в
+                 уже работающее приложение: без него система создала бы вторую
+                 Activity, и `onNewIntent` не вызывался бы вовсе, то есть
+                 DeepLinkSignal.signal() не происходил бы. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="azrael" />
             </intent-filter>
         </activity>
     </application>
