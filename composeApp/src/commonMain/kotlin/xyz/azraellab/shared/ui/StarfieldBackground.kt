@@ -19,7 +19,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.material3.MaterialTheme
 import kotlin.math.PI
 import kotlin.math.hypot
 import kotlin.math.min
@@ -35,6 +37,22 @@ import kotlin.random.Random
  * Координаты звёзд хранятся в долях экрана (0..1), поэтому фон сам подстраивается
  * под поворот и resize; координаты комет и радиусы — в пикселях, как в JS.
  */
+/**
+ * Палитра неба для одной темы.
+ *
+ * Фон — чистая декорация, поэтому WCAG 1.4.11 к нему не применяется: 3:1 для
+ * звёзд требовать нельзя, это не элемент интерфейса. Но на светлой теме белые
+ * звёзды на `#FAFAFA` просто исчезают — фон перестаёт существовать, и это
+ * настоящий дефект, а не вопрос соответствия. Поэтому на светлой схеме набор
+ * инвертируется в тёмный, и контраст звёзд к странице становится ~11:1.
+ */
+data class StarfieldPalette(
+    val stars: List<Pair<Color, Float>>,
+    val flashColor: Color,
+    val trailFrom: Color,
+    val trailTo: Color
+)
+
 private class Star {
     var x = 0f          // доля ширины
     var y = 0f          // доля высоты
@@ -67,20 +85,31 @@ private class StarfieldState {
     private val rnd = Random(System.nanoTime())
     private var nextSpawnMs = 0L
     private var sinceMs = 0L
+    var palette: StarfieldPalette = DARK_PALETTE
+        private set
 
     init {
         repeat(STAR_COUNT) { stars.add(newStar()) }
     }
 
-    /** Цвета звёзд по реальному распределению спектральных классов (A-F белые чаще). */
-    private fun starColor(): Color {
+    /**
+     * Цвета звёзд по реальному распределению спектральных классов (A-F белые чаще).
+     * Палитра приходит снаружи: на светлой теме белые звёзды не видны, поэтому
+     * там набор инвертируется в тёмный (см. [starfieldPalette]).
+     */
+    private fun starColor(palette: List<Pair<Color, Float>>): Color {
         val roll = rnd.nextFloat() * 100f
         var cum = 0f
-        for ((c, w) in STAR_COLORS) {
+        for ((c, w) in palette) {
             cum += w
             if (roll < cum) return c
         }
-        return Color.White
+        return palette.last().first
+    }
+
+    fun setPalette(palette: StarfieldPalette) {
+        this.palette = palette
+        for (s in stars) s.color = starColor(palette.stars)
     }
 
     private fun newStar(): Star = Star().also { s ->
@@ -91,7 +120,7 @@ private class StarfieldState {
         s.speed = 0.4f + rnd.nextFloat() * 1.6f
         s.minO = 0.08f + rnd.nextFloat() * 0.12f
         s.maxO = 0.85f + rnd.nextFloat() * 0.15f
-        s.color = starColor()
+        s.color = starColor(palette.stars)
         s.hitTimer = 0
     }
 
@@ -178,16 +207,46 @@ private class StarfieldState {
         const val MAX_COMETS = 5
         const val COMET_SPAWN_MIN_MS = 2600
         const val COMET_SPAWN_MAX_MS = 7200
-        val STAR_COLORS = listOf(
-            Color(0xFFFFF5F0) to 55f,
-            Color(0xFFFFF0C8) to 18f,
-            Color(0xFFFFC878) to 12f,
-            Color(0xFFFF9696) to 8f,
-            Color(0xFFB4C8FF) to 5f,
-            Color(0xFFDEE4FF) to 2f
-        )
     }
 }
+
+/**
+ * Распределение спектральных классов одинаковое в обеих палитрах — меняется только
+ * светлота, чтобы на тёмном небе звёзды остались тёплыми белыми, а на светлом —
+ * тёмными синеватыми. Раньше был один набор на оба фона, и на `#FAFAFA` фон
+ * выглядел пустым.
+ */
+private val DARK_PALETTE = StarfieldPalette(
+    stars = listOf(
+        Color(0xFFFFF5F0) to 55f,
+        Color(0xFFFFF0C8) to 18f,
+        Color(0xFFFFC878) to 12f,
+        Color(0xFFFF9696) to 8f,
+        Color(0xFFB4C8FF) to 5f,
+        Color(0xFFDEE4FF) to 2f
+    ),
+    flashColor = Color.White,
+    trailFrom = Color(0xFFC8B4FF),
+    trailTo = Color.White
+)
+
+private val LIGHT_PALETTE = StarfieldPalette(
+    stars = listOf(
+        Color(0xFF1F2937) to 55f,
+        Color(0xFF3F3A2E) to 18f,
+        Color(0xFF5C4A22) to 12f,
+        Color(0xFF6B3131) to 8f,
+        Color(0xFF27407A) to 5f,
+        Color(0xFF2E3560) to 2f
+    ),
+    flashColor = Color(0xFF0A0A0A),
+    trailFrom = Color(0xFF7C6BD6),
+    trailTo = Color(0xFF1A1A2E)
+)
+
+/** Палитра неба под текущую тему. Чистая функция — её можно проверить тестом. */
+internal fun starfieldPalette(dark: Boolean): StarfieldPalette =
+    if (dark) DARK_PALETTE else LIGHT_PALETTE
 
 private const val TRAIL_LEN_PX = 120f
 
@@ -208,6 +267,14 @@ private fun trimTrail(trail: List<Offset>): List<Offset> {
 fun StarfieldBackground(modifier: Modifier = Modifier) {
     val state = remember { StarfieldState() }
     val density = LocalDensity.current.density
+    // Тема берётся из самой палитры, а не из isSystemInDarkTheme(): фон рисуется под
+    // ту же MaterialTheme, что и карточки поверх него, иначе при ручном переключении
+    // темы звёзды остались бы белыми на светлой.
+    val page = MaterialTheme.colorScheme.background
+    val palette = remember(page) { starfieldPalette(page.luminance() < 0.5f) }
+    // Перекрашиваем уже созданные звёзды, иначе смена темы оставила бы старые цвета
+    // до пересоздания состояния (remember без ключа переживает смену темы).
+    LaunchedEffect(palette) { state.setPalette(palette) }
     var tick by remember { mutableIntStateOf(0) }
 
     BoxWithConstraints(modifier) {
@@ -229,27 +296,34 @@ fun StarfieldBackground(modifier: Modifier = Modifier) {
 
         Canvas(Modifier.fillMaxSize()) {
             // Время для мерцания: монотонный «кадровый» счётчик, как performance.now() на сайте.
-            drawStars(state, size.width, size.height, tick * 16.7f, density)
-            state.comets.forEach { drawComet(it, density) }
+            drawStars(state, size.width, size.height, tick * 16.7f, density, palette)
+            state.comets.forEach { drawComet(it, density, palette) }
         }
     }
 }
 
-private fun DrawScope.drawStars(state: StarfieldState, w: Float, h: Float, timeMs: Float, d: Float) {
+private fun DrawScope.drawStars(
+    state: StarfieldState,
+    w: Float,
+    h: Float,
+    timeMs: Float,
+    d: Float,
+    palette: StarfieldPalette
+) {
     for (s in state.stars) {
         val r: Float
         val color: Color
         val alpha: Float
         if (s.hitTimer > 60) {
-            // Фаза 1: разгорание — радиус +50%, цвет к белому, прозрачность 1.
+            // Фаза 1: разгорание — радиус +50%, цвет к «вспышке» темы, прозрачность 1.
             val t = (s.hitTimer - 60) / 30f
             r = s.r * (1f + (1f - t) * 0.5f)
-            color = lerpToWhite(s.color, 1f - t)
+            color = lerpTo(s.color, palette.flashColor, 1f - t)
             alpha = 1f
         } else if (s.hitTimer > 0) {
-            // Фаза 2: затухание — радиус ×1.5, белый, прозрачность падает.
+            // Фаза 2: затухание — радиус ×1.5, вспышка, прозрачность падает.
             r = s.r * 1.5f
-            color = Color.White
+            color = palette.flashColor
             alpha = s.hitTimer / 60f
         } else {
             val tw = 0.5f + 0.5f * sin(timeMs * 0.001f * s.speed + s.phase)
@@ -265,15 +339,19 @@ private fun DrawScope.drawStars(state: StarfieldState, w: Float, h: Float, timeM
     }
 }
 
-private fun lerpToWhite(c: Color, t: Float): Color = Color(
-    red = c.red + (1f - c.red) * t,
-    green = c.green + (1f - c.green) * t,
-    blue = c.blue + (1f - c.blue) * t,
+private fun lerpTo(c: Color, target: Color, t: Float): Color = Color(
+    red = c.red + (target.red - c.red) * t,
+    green = c.green + (target.green - c.green) * t,
+    blue = c.blue + (target.blue - c.blue) * t,
     alpha = 1f
 )
 
-/** Белая комета: шлейф пурпурный→белый, голова — белый круг. Зеркало drawNormal. */
-private fun DrawScope.drawComet(c: Comet, d: Float) {
+/**
+ * Комета: шлейф пурпурный→вспышка темы, голова — круг цвета вспышки.
+ * Зеркало drawNormal; на светлой теме «вспышка» тёмная, иначе шлейф был бы
+ * почти белым на почти белом фоне.
+ */
+private fun DrawScope.drawComet(c: Comet, d: Float, palette: StarfieldPalette) {
     val opacity = if (c.progress >= 1f) c.life else 1f
     if (opacity <= 0f) return
     val trail = trimTrail(c.trail)
@@ -292,8 +370,8 @@ private fun DrawScope.drawComet(c: Comet, d: Float) {
             path = path,
             brush = Brush.linearGradient(
                 listOf(
-                    Color(0xFFC8B4FF).copy(alpha = 0.10f * opacity),
-                    Color.White.copy(alpha = 0.85f * opacity)
+                    palette.trailFrom.copy(alpha = 0.10f * opacity),
+                    palette.trailTo.copy(alpha = 0.85f * opacity)
                 ),
                 start = Offset(trail.first().x, trail.first().y),
                 end = Offset(trail.last().x, trail.last().y)
@@ -302,7 +380,7 @@ private fun DrawScope.drawComet(c: Comet, d: Float) {
         )
     }
     drawCircle(
-        color = Color.White.copy(alpha = 0.9f * opacity),
+        color = palette.trailTo.copy(alpha = 0.9f * opacity),
         radius = c.size * 0.9f * d,
         center = Offset(c.headX(), c.headY())
     )
