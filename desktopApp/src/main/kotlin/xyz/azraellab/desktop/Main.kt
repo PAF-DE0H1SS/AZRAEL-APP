@@ -8,18 +8,27 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import xyz.azraellab.shared.App
+import xyz.azraellab.shared.AppDeepLink
 
 // Точка входа десктопного клиента AZRAEL-APP.
 // Общий UI (App) берётся из composeApp; JNI (C++) в desktop недоступен,
 // поэтому вместо нативного приветствия передаётся fallback-строка.
-fun main() = application {
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "AZRAEL-APP",
-        state = rememberWindowState(width = 720.dp, height = 480.dp),
-        icon = desktopAppIcon()
-    ) {
-        App(nativeGreeting = { "JNI is Android-only" })
+// Аргументы командной строки берём здесь, а не из `ApplicationScope`:
+// в Compose 1.12.1 у `ApplicationScope` есть только `exitApplication()`.
+fun main(args: Array<String>) {
+    // Deep link из командной строки: `azrael-app azrael://messages/42`.
+    // Ссылка кладётся в очередь до старта композиции — её заберёт `MainShell`
+    // после того, как придёт `tabConfig` и станут понятны права.
+    AppDeepLink.offer(args.firstOrNull { it.startsWith("azrael://") })
+    application {
+        Window(
+            onCloseRequest = ::exitApplication,
+            title = "AZRAEL-APP",
+            state = rememberWindowState(width = 720.dp, height = 480.dp),
+            icon = desktopAppIcon()
+        ) {
+            App(nativeGreeting = { "JNI is Android-only" })
+        }
     }
 }
 

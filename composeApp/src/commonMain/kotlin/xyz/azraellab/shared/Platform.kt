@@ -1,6 +1,9 @@
 package xyz.azraellab.shared
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import xyz.azraellab.shared.core.crypto.Crypto
 
@@ -66,6 +69,34 @@ expect fun initStorageDir(dir: String)
 /** Диагностический лог непойманной ошибки: на Android в logcat, на desktop в stderr. */
 expect fun logAzraelError(tag: String, message: String, error: Throwable?)
 
+/**
+ * Есть ли сеть — реактивно, для баннера «нет подключения».
+ *
+ * Общего API «онлайн» в Compose Multiplatform нет, поэтому точка входа
+ * expect/actual. На Android состояние приходит из `ConnectivityManager`
+ * (событийно, без опроса), на desktop сетевого менеджера с колбэками нет —
+ * там интерфейсы опрашиваются по таймеру.
+ *
+ * Намеренно НЕ проверка «доступен ли сервер»: сеть может быть, а канал — нет,
+ * и это уже показывает `AzraelErrorState` на конкретном экране. Индикатор
+ * отвечает только на «устройство вообще отрезано от сети».
+ */
+@Composable
+expect fun rememberOnline(): Boolean
+
+/**
+ * Аппаратная кнопка «Назад» (жест или кнопка системы).
+ *
+ * Общего `BackHandler` в Compose Multiplatform 1.12 нет — он живёт в
+ * `androidx.activity.compose`, который есть только у android-таргета. Поэтому
+ * точка входа expect/actual, а не общий composable: вызывающий код не знает про
+ * платформу, а `Navigator.back()` остаётся единственным источником истины.
+ *
+ * На desktop — no-op: там нет системной кнопки, «назад» живёт в боковой рельсе.
+ */
+@Composable
+expect fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit)
+
 expect object AppTrap {
     /** Стабильный идентификатор устройства (для отзыва через /admin). */
     fun deviceId(): String
@@ -127,6 +158,51 @@ expect object AppLangStore {
 
     /** Сохранить код языка. */
     fun write(code: String): Boolean
+}
+
+expect object AppThemeStore {
+    /** Сохранённый режим темы (system/light/dark) или null. */
+    fun read(): String?
+
+    /** Сохранить режим темы. */
+    fun write(mode: String): Boolean
+}
+
+/**
+ * Внешняя ссылка на раздел приложения.
+ *
+ * Ссылка приходит извне (intent на Android, аргумент запуска на desktop), поэтому
+ * разбирать её надо **после** проверки прав: [xyz.azraellab.shared.ui.nav.Navigator.openDeepLink]
+ * отбрасывает разделы, которых нет в `tabConfig`, а `parseDestination` не бросает на мусоре.
+ */
+expect object AppDeepLink {
+    /**
+     * Забрать и обнулить накопленную ссылку: `azrael://messages/42` → `messages/42`.
+     * Повторный вызов вернёт null — ссылка одноразовая, иначе refresh экрана
+     * возвращал бы пользователя в комнату чата.
+     */
+    fun consume(): String?
+}
+
+/**
+ * Счётчик входящих ссылок для Compose.
+ *
+ * Почему он общий, а не в actual: ссылка может прийти **после** того, как `MainShell`
+ * уже собрался (`onNewIntent` в работающем приложении). Если platform-код только
+ * копит строку, а `LaunchedEffect(bootTick)` её читает, ссылка ждёт до следующего
+ * refresh `tabConfig` — то есть «нажал на ссылку в мессенджере, ничего не открылось».
+ * Счётчик — единственное общее для expect/actual изменяемое состояние, поэтому он
+ * живёт здесь, а платформы только инкрементируют его.
+ */
+object DeepLinkSignal {
+    private var tick by mutableIntStateOf(0)
+
+    /** Растёт на каждую входящую ссылку; читается в `LaunchedEffect`. */
+    val version: Int get() = tick
+
+    internal fun signal() {
+        tick++
+    }
 }
 
 internal fun stripDataUrl(data: String): String =

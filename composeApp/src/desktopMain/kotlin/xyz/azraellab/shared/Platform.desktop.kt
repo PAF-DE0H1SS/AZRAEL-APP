@@ -1,8 +1,13 @@
 package xyz.azraellab.shared
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.awt.Toolkit
@@ -14,6 +19,8 @@ import java.util.Base64
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
@@ -26,6 +33,56 @@ actual fun logAzraelError(tag: String, message: String, error: Throwable?) {
     System.err.println("[$tag] $message")
     error?.printStackTrace()
 }
+
+/**
+ * На десктопе сетевого менеджера с колбэками нет (и не должно быть — JVM общая),
+ * поэтому «есть ли сеть» = «есть ли поднятый не-loopback интерфейс». Опрос по
+ * таймеру: события на интерфейсах JVM не рассылает, а лезть в нативные нотификации
+ * ради одного баннера дороже, чем лёгкая проверка раз в несколько секунд.
+ */
+@Composable
+actual fun rememberOnline(): Boolean {
+    var online by remember { mutableStateOf(hasNetwork()) }
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(ONLINE_POLL_MS)
+            val now = withContext(Dispatchers.IO) { hasNetwork() }
+            if (now != online) online = now
+        }
+    }
+    return online
+}
+
+/** Интерфейс без адреса и не поднятый — сети нет; loopback («провод назад») не в счёт. */
+private fun hasNetwork(): Boolean = netAvailable(
+    runCatching { java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty() }
+        .getOrDefault(emptyList())
+        .map { NetIf(it.isUp, it.isLoopback, it.interfaceAddresses?.isNotEmpty() == true) }
+)
+
+/**
+ * Признаки одного сетевого интерфейса — вынесены отдельно от `java.net`, чтобы
+ * правило можно было проверить тестом (см. `OnlineTest`) без JVM.
+ */
+internal data class NetIf(val up: Boolean, val loopback: Boolean, val hasAddress: Boolean)
+
+/**
+ * Сеть считается доступной, если есть хоть один поднятый не-loopback интерфейс
+ * с адресом. Ни одного интерфейса (в том числе когда `getNetworkInterfaces()`
+ * бросил — это тоже «не знаем») — сети нет.
+ */
+internal fun netAvailable(interfaces: List<NetIf>): Boolean =
+    interfaces.any { it.up && !it.loopback && it.hasAddress }
+
+private const val ONLINE_POLL_MS = 4_000L
+
+/**
+ * На десктопе системной кнопки «Назад» нет, поэтому обработчик пустой, а не
+ * Escape: `Escape` в этом приложении занят отменой полей ввода, и подменять его
+ * молча значило бы сломать привычку. «Назад» остаётся кнопкой в боковой рельсе.
+ */
+@Composable
+actual fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit): Unit = Unit
 
 
 @Composable
@@ -239,6 +296,30 @@ actual object AppVault {
     }.getOrDefault(false)
 }
 
+/** Режим темы на десктопе: ~/.config/azraellab/theme, рядом с языком (не секрет). */
+actual object AppThemeStore {
+    private fun file(): File {
+        val home = System.getProperty("user.home") ?: "."
+        return File(home, ".config/azraellab/theme")
+    }
+
+    actual fun read(): String? = runCatching {
+        val f = file()
+        if (!f.isFile) return null
+        f.readText().trim().takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    actual fun write(mode: String): Boolean = runCatching {
+        val f = file()
+        val parent = f.parentFile
+        if (!parent.exists()) parent.mkdirs()
+        val tmp = Path.of(f.absolutePath + ".tmp")
+        Files.write(tmp, mode.toByteArray(Charsets.UTF_8))
+        Files.move(tmp, Path.of(f.absolutePath), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        true
+    }.getOrDefault(false)
+}
+
 /** Язык интерфейса на десктопе: ~/.config/azraellab/lang, рядом с vault (не секрет). */
 actual object AppLangStore {
     private fun file(): File {
@@ -261,4 +342,30 @@ actual object AppLangStore {
         Files.move(tmp, Path.of(f.absolutePath), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         true
     }.getOrDefault(false)
+}
+/**
+ * Deep link на desktop. Принимается аргументом запуска вида
+ * `azrael-app azrael://messages/42` (`Main.kt` разбирает `applicationArgs` и
+ * вызывает [offer]) или системным свойством `azrael.deeplink` — так ссылку можно
+ * открыть из браузера/скрипта без правки кода.
+ */
+actual object AppDeepLink {
+    private var pending: String? = null
+
+    /** Кладёт ссылку в очередь; вызывается точкой входа до старта композиции. */
+    fun offer(raw: String?) {
+        val value = raw?.trim()?.ifEmpty { null } ?: return
+        pending = value.substringAfter("://", value).ifEmpty { value }
+        DeepLinkSignal.signal()
+    }
+
+    actual fun consume(): String? {
+        pending?.let { pending = null; return it }
+        val fromProp = System.getProperty("azrael.deeplink")
+        if (!fromProp.isNullOrBlank()) {
+            System.clearProperty("azrael.deeplink")
+            return fromProp.substringAfter("://", fromProp).ifEmpty { fromProp }
+        }
+        return null
+    }
 }

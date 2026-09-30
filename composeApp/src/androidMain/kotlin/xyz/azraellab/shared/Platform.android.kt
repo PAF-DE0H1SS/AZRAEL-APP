@@ -2,16 +2,25 @@ package xyz.azraellab.shared
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.util.Base64
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -22,6 +31,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 actual fun platformName(): String = "Android"
+
+/**
+ * Системная кнопка/жест «Назад». Пока стек глубже одного пункта, назад должен
+ * уводить внутрь приложения (комната чата → список чатов), а не закрывать его:
+ * иначе пользователь теряет открытый раздел и стек молча пересоздаётся.
+ */
+@Composable
+actual fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit) {
+    BackHandler(enabled = enabled, onBack = onBack)
+}
 
 private var storageDir: File? = null
 
@@ -35,6 +54,53 @@ actual fun initStorageDir(dir: String) {
 
 actual fun logAzraelError(tag: String, message: String, error: Throwable?) {
     Log.e(tag, message, error)
+}
+
+/**
+ * Сеть на Android — событийная: `registerDefaultNetworkCallback` сам сообщает о
+ * появлении и пропадании сети, опрос не нужен.
+ *
+ * Проверяется `NET_CAPABILITY_INTERNET` + `NET_CAPABILITY_VALIDATED`, а не просто
+ * «есть активная сеть»: Wi-Fi с captive-порталом (аэропорт, гостиница) даёт
+ * активный интерфейс без валидации, и по такому признаку баннер «нет сети» не
+ * показывался бы именно тогда, когда он нужен. Право `ACCESS_NETWORK_STATE`
+ * добавлено в манифест — без него `activeNetwork` всегда null.
+ */
+@Composable
+actual fun rememberOnline(): Boolean {
+    val context = LocalContext.current
+    var online by remember { mutableStateOf(context.isValidatedOnline()) }
+    DisposableEffect(context) {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                online = context.isValidatedOnline()
+            }
+
+            override fun onLost(network: Network) {
+                online = context.isValidatedOnline()
+            }
+
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                online = context.isValidatedOnline()
+            }
+        }
+        // Регистрация может упасть (например, если сервис недоступен) — тогда
+        // остаётся значение, посчитанное при входе, индикатор просто не оживёт.
+        val registered = runCatching {
+            manager?.registerDefaultNetworkCallback(callback)
+        }.isSuccess
+        onDispose { if (registered) runCatching { manager?.unregisterNetworkCallback(callback) } }
+    }
+    return online
+}
+
+private fun Context.isValidatedOnline(): Boolean {
+    val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+    val network = manager.activeNetwork ?: return false
+    val caps = manager.getNetworkCapabilities(network) ?: return false
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }
 
 /**
@@ -255,6 +321,25 @@ actual object AppVault {
     }.getOrDefault(false)
 }
 
+/** Режим темы на Android: тот же каталог установки, что и у vault. */
+actual object AppThemeStore {
+    private fun file(): File = File(AppVault.baseDir(), "theme")
+
+    actual fun read(): String? = runCatching {
+        val f = file()
+        if (!f.isFile) return null
+        f.readText().trim().takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    actual fun write(mode: String): Boolean = runCatching {
+        val f = file()
+        val dir = f.parentFile
+        if (!dir.exists()) dir.mkdirs()
+        f.writeText(mode)
+        true
+    }.getOrDefault(false)
+}
+
 /** Язык интерфейса на Android: тот же каталог установки, что и у vault. */
 actual object AppLangStore {
     private fun file(): File = File(AppVault.baseDir(), "lang")
@@ -272,4 +357,27 @@ actual object AppLangStore {
         f.writeText(code)
         true
     }.getOrDefault(false)
+}
+/**
+ * Deep link с Android. `MainActivity` кладёт сюда `intent.data` из
+ * `onCreate`/`onNewIntent`; ссылка одноразовая (`consume` обнуляет), иначе
+ * пересоздание Activity возвращало бы пользователя в комнату чата снова.
+ */
+actual object AppDeepLink {
+    private var pending: String? = null
+
+    /** Вызывается из Activity при получении intent'а со схемой `azrael://`. */
+    fun offer(uri: Uri?) {
+        val raw = uri?.toString() ?: return
+        pending = raw.substringAfter("://", raw).ifEmpty { raw }
+        // Сигнал нужен, чтобы ссылка, пришедшая в уже работающее приложение,
+        // не ждала следующего refresh `tabConfig`.
+        DeepLinkSignal.signal()
+    }
+
+    actual fun consume(): String? {
+        val value = pending
+        pending = null
+        return value
+    }
 }
