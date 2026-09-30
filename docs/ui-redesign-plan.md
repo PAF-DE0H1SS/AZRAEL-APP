@@ -134,8 +134,12 @@ composeApp/src/commonMain/kotlin/xyz/azraellab/shared/
         `MainShellScreen`, `StatusScreens` — 2026-09-29
   - [x] Офлайн-индикатор (`MainShellScreen` + `rememberOnline()`) — был сделан в P1
 - [ ] Смоук: вход → чат → файл → сокращатель → VPN → админка
-  - [ ] Автоматическая часть: сборки + `desktopTest` + контраст-тесты (сделано, 146/146)
+  - [x] Автоматическая часть: сборки + `desktopTest` + контраст-тесты (146/146)
+  - [x] Реальный запуск под Xvfb в обеих темах: окно 716×476, фон L=244 / L=15,
+        звёзды анимируются (275 / 314 пикселей за 3 с), исключений нет
   - [ ] Ручная часть: нужен тестовый аккаунт или `AZRAEL_FLIGHT_INVITE`
+  - [x] Сервер анонимно жив: `POST /api/app/v1` без подписи → `400 bad envelope`,
+        `POST /api/auth` с неверным паролем → `401`
 - [x] Android + desktop сборка — 2026-09-29 (`compileKotlinDesktop` + `compileAndroidMain`)
 - [x] WCAG-контраст компонентов (`ContrastTest`, 20 тестов) — 2026-09-29
 - [x] Палитра звёздного фона по теме (`starfieldPalette`) — 2026-09-29
