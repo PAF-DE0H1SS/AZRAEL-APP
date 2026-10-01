@@ -18,6 +18,14 @@
           in !(type == "directory" && (base == ".gradle" || base == ".kotlin" || base == ".idea" || base == "build"));
       };
 
+      appVersion =
+        let
+          line = builtins.match ".*azraelVersion=([^ \r\n]*).*"
+            (builtins.readFile (self + "/gradle.properties"));
+        in
+        if line == null then "0.0.0-unknown"
+        else builtins.head line;
+
       mkApp = system:
         let
           pkgs = pkgsFor system;
@@ -25,7 +33,7 @@
         in
         pkgs.stdenvNoCC.mkDerivation {
           pname = "azrael-app";
-          version = "1.0.0";
+          version = appVersion;
           src = src;
 
           nativeBuildInputs = with pkgs; [ jdk cmake ninja binutils ];

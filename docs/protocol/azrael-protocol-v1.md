@@ -2,6 +2,29 @@
 
 Транспорт между публичным клиентом AZRAEL-APP и защищённым шлюзом `azrael-lab.xyz`.
 
+## Область действия (что этот документ описывает, а что - нет)
+
+Документ покрывает **только L2-канал**: `POST /api/gateway/v1`, конверт `Envelope`,
+X25519-handshake и AES-256-GCM. Это реализация - `core/protocol/`
+(`Envelope.kt`, `SessionBox.kt`, `GatewayClient.kt`, `Http.kt` + actual'ы для
+desktop/android).
+
+Он **не** описывает остальные сетевые пути клиента:
+
+| путь | назначение | где в коде | чем описан |
+|---|---|---|---|
+| `GET /api/app/bootstrap` | выдача per-install ключа канала (X25519, `AppKeyBootstrap`) | `core/api/AppKeyBootstrap.kt` | нет отдельной спеки |
+| `POST /api/app/v1` | 63 операции приложения (auth, profile, devices, chats, invites, shortener, VPN, admin) | `core/api/AppClient.kt` | нет; контракт живёт в коде и на сервере |
+| `POST /api/app/v2/l2` | L2-переговоры на стороне сервера (`_SRV_X_PUB`) | `AppClient` | этот документ не покрывает |
+
+Устройство подписи и конверта AppSecure v1 (Ed25519 на запросе, per-install anchor,
+ротация поколений, poison/trap/release) документировано в
+`APP_DEV_LOG/13-app-v1-133-hardening-release-prep.md` и в коде
+`core/api/AppSecure.kt` / `AppInstall.kt` / `core/crypto/`.
+
+Криптография канала (Ed25519, SHA-512, Fe25519) реализована **чистым Kotlin** в
+`commonMain`, без платформенных зависимостей; JCA остался только в тестах как oracle.
+
 ## Принципы
 
 1. Клиент знает ТОЛЬКО единую точку входа (домен) и номер версии протокола.

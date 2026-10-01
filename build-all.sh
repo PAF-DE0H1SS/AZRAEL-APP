@@ -12,6 +12,10 @@
 #
 #  Java: ищем полный JDK 17+ (нужен jpackage для createDistributable);
 #        иначе JBR Android Studio (только для APK, без дистрибутива).
+#
+#  Публикация: в build/dist появляются PUBLISHABLE (можно публиковать),
+#  UNPUBLISHABLE (внутри /nix/store - только локально) и SHA256SUMS.
+#  AZRAEL_PUBLISH_STRICT=1 превращает наличие непригодных файлов в ошибку.
 # ============================================================
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -145,6 +149,47 @@ if [ "$(id -u)" = "0" ]; then
   else
     echo "[AZRAEL] ВНИМАНИЕ: владелец артефактов остался root ($DIST)" >&2
   fi
+fi
+
+# Публикуемость: NixOS-сборка jlink/jpackage вписывает /nix/store в launcher,
+# .desktop и конфигурацию - на debian/ubuntu/windows такие файлы не работают.
+# Публиковать можно только то, что прошло проверку: имена в PUBLISHABLE.
+CHECKSUMS="$DIST/SHA256SUMS"
+PUBLISHABLE="$DIST/PUBLISHABLE"
+REJECTED="$DIST/UNPUBLISHABLE"
+rm -f "$CHECKSUMS" "$PUBLISHABLE" "$REJECTED"
+: > "$PUBLISHABLE"
+: > "$REJECTED"
+
+for f in "$DIST"/*; do
+  [ -f "$f" ] || continue
+  name=$(basename "$f")
+  case "$name" in
+    SHA256SUMS|PUBLISHABLE|UNPUBLISHABLE) continue ;;
+  esac
+  if LC_ALL=C grep -a -q -m1 '/nix/store' "$f" 2>/dev/null; then
+    echo "$name" >> "$REJECTED"
+  else
+    echo "$name" >> "$PUBLISHABLE"
+  fi
+done
+
+( cd "$DIST" && cat PUBLISHABLE UNPUBLISHABLE | while IFS= read -r n; do
+    if [ -n "$n" ]; then
+      sha256sum "$n"
+    fi
+  done > SHA256SUMS )
+
+if [ -s "$REJECTED" ]; then
+  echo "[AZRAEL] === НЕ ПУБЛИКУЕМО (внутри /nix/store): ===" >&2
+  sed 's/^/  - /' "$REJECTED" >&2
+  echo "[AZRAEL] Публиковать только файлы из $PUBLISHABLE" >&2
+  if [ "${AZRAEL_PUBLISH_STRICT:-0}" = "1" ]; then
+    echo "[AZRAEL] AZRAEL_PUBLISH_STRICT=1 - сборка считается непригодной к публикации" >&2
+    exit 1
+  fi
+else
+  echo "[AZRAEL] === Все артефакты публикуемы ==="
 fi
 
 echo "[AZRAEL] === Готово. Артефакты: ==="
