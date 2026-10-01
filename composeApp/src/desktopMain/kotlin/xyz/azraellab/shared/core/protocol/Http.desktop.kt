@@ -5,9 +5,9 @@ import java.net.URL
 
 /**
  * Соединение без keep-alive: HttpURLConnection переиспользует сокет из пула, но
- * Cloudflare/HTTP2 закрывает его сам, и следующий запрос уходит в уже мёртвый сокет —
+ * Cloudflare/HTTP2 закрывает его сам, и следующий запрос уходит в уже мёртвый сокет -
  * запись проходит «в никуда», а чтение висит до readTimeout (20 с) и выглядит как
- * «network: no response». Каждый запрос канала — отдельный подписанный конверт, выигрыша
+ * «network: no response». Каждый запрос канала - отдельный подписанный конверт, выигрыша
  * от keep-alive здесь нет, поэтому соединение закрываем явно.
  */
 private fun openOnce(url: String, timeoutMs: Int): HttpURLConnection =
@@ -96,7 +96,7 @@ actual fun httpPostJsonWithHeaders(url: String, body: String, headers: Map<Strin
 actual fun defaultGatewayUrl(): String? =
     AppRuntime.gatewayUrl?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_GATEWAY_URL")?.takeIf { it.isNotBlank() }
 
-// URL кастомного API приложения из AZRAEL_APP_URL; дефолт — как на Android,
+// URL кастомного API приложения из AZRAEL_APP_URL; дефолт - как на Android,
 // чтобы адрес не приходилось вводить вручную (в сборку он не секрет).
 actual fun defaultAppUrl(): String? =
     AppRuntime.appUrl?.takeIf { it.isNotBlank() }

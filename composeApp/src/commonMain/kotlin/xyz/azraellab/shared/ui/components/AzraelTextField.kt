@@ -26,17 +26,17 @@ import xyz.azraellab.shared.t
 import xyz.azraellab.shared.ui.theme.AzraelCornerMd
 
 /**
- * Цвета поля — чистые функции (см. комментарий в [AzraelButton]): `colors()` в
+ * Цвета поля - чистые функции (см. комментарий в [AzraelButton]): `colors()` в
  * Material3 `@Composable`, поэтому контракт проверяется по отдельным функциям,
  * которые composable лишь склеивает в `TextFieldColors`.
  */
 
-/** Заливка поля. Фокус и потеря фокуса различаются, но обе — почти прозрачные. */
+/** Заливка поля. Фокус и потеря фокуса различаются, но обе - почти прозрачные. */
 internal fun fieldContainerColor(scheme: ColorScheme, focused: Boolean): Color =
     scheme.onSurface.copy(alpha = if (focused) 0.07f else 0.04f)
 
 /**
- * Рамка поля — единственное место в приложении, где граница поля смысловая: по ней
+ * Рамка поля - единственное место в приложении, где граница поля смысловая: по ней
  * видно, что это поле ввода, и по ней же читается фокус. Поэтому 3:1, а `outline`
  * и акцент без альфы: прежние 10% и 70% давали 1.23 и 2.86 (светлая).
  */
@@ -48,14 +48,14 @@ internal fun fieldBorderColor(scheme: ColorScheme, accent: Color, focused: Boole
     }
 
 /**
- * Подпись поля — текст, значит 4.5:1, а не 3:1. Было `onSurface@42%` (3.67/2.83) —
+ * Подпись поля - текст, значит 4.5:1, а не 3:1. Было `onSurface@42%` (3.67/2.83) -
  * на светлой теме подпись была нечитаема.
  */
 internal fun fieldLabelColor(scheme: ColorScheme, accent: Color, focused: Boolean): Color =
     if (focused) accent else scheme.onSurfaceVariant
 
 /**
- * Подсказка под полем и иконки внутри него — тоже носители информации (глаз =
+ * Подсказка под полем и иконки внутри него - тоже носители информации (глаз =
  * показать пароль), значит 4.5:1 для текста и 3:1 для иконок. Было `@35%`:
  * 2.92/2.31.
  */
@@ -66,7 +66,7 @@ internal fun fieldSupportColor(scheme: ColorScheme): Color = scheme.onSurfaceVar
  * переключателем тем для выбранной роли/акцента.
  *
  * @param accent цвет акцента поля (роль пользователя, валюта ввода) вместо фиксированного.
- * @param spaced разрядка символов — для provision-ключа и пароля (бывший `spaced`).
+ * @param spaced разрядка символов - для provision-ключа и пароля (бывший `spaced`).
  */
 @Composable
 fun AzraelTextField(

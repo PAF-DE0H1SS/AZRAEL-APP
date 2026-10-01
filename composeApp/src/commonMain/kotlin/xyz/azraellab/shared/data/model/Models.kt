@@ -79,7 +79,7 @@ data class DeviceDto(
     val platform: String? = null,
     /**
      * Привязан ли этот devId к аккаунту. Сервер для непривязанной установки
-     * отдаёт `{ bound: false, devId: null }` — поля `status` там нет вовсе,
+     * отдаёт `{ bound: false, devId: null }` - поля `status` там нет вовсе,
      * поэтому `status` без `bound` нельзя трактовать как «состояние».
      */
     val bound: Boolean = false,

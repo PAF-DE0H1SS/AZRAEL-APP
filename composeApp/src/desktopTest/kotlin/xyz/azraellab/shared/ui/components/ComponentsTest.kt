@@ -56,7 +56,7 @@ class ComponentsTest {
     @Test
     fun bannerAccentFollowsThemeInsteadOfDarkPalette() {
         // Смысл всей правки: один и тот же тон в тёмной и светлой теме обязан
-        // давать разные цвета. Если это перестанет быть так — снова появится
+        // давать разные цвета. Если это перестанет быть так - снова появится
         // «тёмное приложение со светлыми словами».
         val dark = listOf(
             AzraelBannerTone.Info, AzraelBannerTone.Success,

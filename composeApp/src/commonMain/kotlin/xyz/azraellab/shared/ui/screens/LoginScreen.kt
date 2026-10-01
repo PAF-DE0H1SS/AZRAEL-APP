@@ -178,7 +178,7 @@ import xyz.azraellab.shared.ui.vm.rememberViewModel
 // ---- Вход и регистрация аккаунта (пароль, инвайт, пол, аватар) ----
 // Оформление повторяет /login сайта (app/login/page.tsx): узкая карточка по центру,
 // сегмент-переключатель вкладок, «стеклянные» поля, чипы выбора, аватар-круг
-// и полноширинная кнопка действия. Фирменные цвета и фон — из ui/Theme.kt.
+// и полноширинная кнопка действия. Фирменные цвета и фон - из ui/Theme.kt.
 
 private enum class AuthTab { Login, Register }
 
@@ -190,7 +190,7 @@ internal fun LoginScreen(
     onLoggedIn: (Session) -> Unit
 ) {
     // rememberSaveable, а не remember: поворот экрана, смена темы/языка или смерть
-    // процесса пересоздают Activity — форма входа не должна молча очищаться.
+    // процесса пересоздают Activity - форма входа не должна молча очищаться.
     var tab by rememberSaveable { mutableStateOf(AuthTab.Login) }
     var username by rememberSaveable { mutableStateOf(client.rememberedLogin()) }
     var password by rememberSaveable { mutableStateOf("") }
@@ -230,7 +230,7 @@ internal fun LoginScreen(
         }
     }
 
-    // Уже привязанная установка: вход по логину/паролю без ключа привязки —
+    // Уже привязанная установка: вход по логину/паролю без ключа привязки -
     // подпись устройства уже подтверждена, ключ выдавать не нужно.
     val alreadyBound = remember { client.isDeviceBound() }
 
@@ -367,7 +367,7 @@ internal fun LoginScreen(
                 } else {
                     AuthField(
                         value = inviteCode,
-                        // Коды на сайте всегда в верхнем регистре — приводим сразу.
+                        // Коды на сайте всегда в верхнем регистре - приводим сразу.
                         onValueChange = { inviteCode = it.uppercase().take(11); clearError() },
                         label = t["login.invite.label"],
                         supporting = t["login.invite.hint"],
@@ -538,7 +538,7 @@ private fun BrandMark() {
     }
 }
 
-/** Сегмент-переключатель «Вход / Регистрация» — как на сайте. */
+/** Сегмент-переключатель «Вход / Регистрация» - как на сайте. */
 @Composable
 private fun AuthTabs(selected: AuthTab, enabled: Boolean, onSelect: (AuthTab) -> Unit) {
     Row(
@@ -655,7 +655,7 @@ private fun AuthField(
     )
 }
 
-/** Полоса надёжности пароля при регистрации — как PasswordStrength на сайте. */
+/** Полоса надёжности пароля при регистрации - как PasswordStrength на сайте. */
 @Composable
 private fun PasswordStrengthMeter(password: String) {
     if (password.isEmpty()) return
@@ -874,7 +874,7 @@ private fun ProvisionKeyCard(value: String, onValueChange: (String) -> Unit, ena
     }
 }
 
-/** Чекбокс «Запомнить устройство» — вся строка кликабельна. */
+/** Чекбокс «Запомнить устройство» - вся строка кликабельна. */
 @Composable
 private fun RememberDeviceRow(checked: Boolean, enabled: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
@@ -903,7 +903,7 @@ private fun RememberDeviceRow(checked: Boolean, enabled: Boolean, onCheckedChang
     }
 }
 
-/** Статус/ошибка над кнопкой действия — как на сайте (красный текст под полями). */
+/** Статус/ошибка над кнопкой действия - как на сайте (красный текст под полями). */
 @Composable
 private fun StatusBanner(text: String, isError: Boolean) {
     val accent = if (isError) Color(0xFFF87171) else MaterialTheme.colorScheme.secondary

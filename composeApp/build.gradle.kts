@@ -27,7 +27,7 @@ kotlin {
 
     sourceSets {
         // Раньше androidLibrary и jvm("desktop") пришлось соединять отдельным
-        // jvmCommonMain ради Ed25519 на BigInteger. Теперь крипто — чистый
+        // jvmCommonMain ради Ed25519 на BigInteger. Теперь крипто - чистый
         // Kotlin в commonMain (core/crypto/{Ed25519,Fe25519,Sha512}.kt), и
         // посредник не нужен.
         commonMain.dependencies {

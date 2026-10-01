@@ -24,8 +24,8 @@ import xyz.azraellab.shared.ui.theme.contrastOver
  * палитры или компонента без правки контракта валит тест.
  *
  * Правила WCAG AA, которые тут применяются:
- *  - 1.4.3 — текст 4.5:1;
- *  - 1.4.11 — границы элементов управления и значимые иконки 3:1.
+ *  - 1.4.3 - текст 4.5:1;
+ *  - 1.4.11 - границы элементов управления и значимые иконки 3:1.
  */
 class ContrastTest {
 
@@ -36,13 +36,13 @@ class ContrastTest {
 
     /**
      * Подложка, на которой реально окажется компонент: фон схемы сам полупрозрачен
-     * (`surface` — это 5% белого), поэтому «сравнить цвет с `background` схемы»
+     * (`surface` - это 5% белого), поэтому «сравнить цвет с `background` схемы»
      * нельзя, сначала надо положить фон на страницу.
      */
     private fun ColorScheme.page(): Color =
         if (background.alpha < 1f) composite(background, Color.Black) else background
 
-    /** Заливка компонента поверх страницы — то, что видит глаз под полупрозрачным слоем. */
+    /** Заливка компонента поверх страницы - то, что видит глаз под полупрозрачным слоем. */
     private fun ColorScheme.overPage(color: Color): Color = composite(color, page())
 
     private fun assertText(c: Double, what: String, scheme: String) = assertTrue(
@@ -60,7 +60,7 @@ class ContrastTest {
         schemes.forEach { (name, s) ->
             AzraelButtonTone.entries.forEach { tone ->
                 listOf(false, true).forEach { busy ->
-                    // `busy` гасит подпись Glass — это состояние работы, а не ошибка,
+                    // `busy` гасит подпись Glass - это состояние работы, а не ошибка,
                     // но подпись всё равно обязана оставаться читаемой.
                     val container = s.overPage(buttonContainerColor(tone, s, busy))
                     val content = buttonContentColor(tone, s, busy)
@@ -89,7 +89,7 @@ class ContrastTest {
 
     @Test
     fun dangerButtonStaysSeparatedFromItsBackdrop() {
-        // Заливка Danger почти совпадает с фоном страницы, поэтому граница — единственное,
+        // Заливка Danger почти совпадает с фоном страницы, поэтому граница - единственное,
         // что отличает кнопку «отменить» от подложки. Проверяем обе роли вместе.
         schemes.forEach { (name, s) ->
             val border = contrastOver(buttonBorderColor(AzraelButtonTone.Danger, s), s.page())
@@ -156,7 +156,7 @@ class ContrastTest {
     fun fieldLabelsAndHintsPassTextContrast() {
         schemes.forEach { (name, s) ->
             listOf(false, true).forEach { focused ->
-                // В фокусе подпись уезжает на заливку поля (7% onSurface), не в фокусе —
+                // В фокусе подпись уезжает на заливку поля (7% onSurface), не в фокусе -
                 // на обычную (4%). Подложки разные, поэтому проверяем обе.
                 val container = s.overPage(fieldContainerColor(s, focused))
                 assertText(
@@ -171,7 +171,7 @@ class ContrastTest {
                 "подсказка поля",
                 name
             )
-            // Иконки внутри поля — значимая графика (глаз = показать пароль), 3:1.
+            // Иконки внутри поля - значимая графика (глаз = показать пароль), 3:1.
             assertNonText(
                 contrast(composite(fieldSupportColor(s), container), container),
                 "иконка внутри поля",
@@ -182,7 +182,7 @@ class ContrastTest {
 
     @Test
     fun accentAsFocusedLabelIsReadableInLightTheme() {
-        // Регрессия: светлый `primary` #15803D давал 4.14 на заливке поля в фокусе —
+        // Регрессия: светлый `primary` #15803D давал 4.14 на заливке поля в фокусе -
         // чуть ниже 4.5. Подпись в фокусе красится акцентом, значит падение
         // контраста акцента автоматически ломает подпись поля.
         val light = AzraelLightScheme
@@ -193,9 +193,9 @@ class ContrastTest {
 
     @Test
     fun starfieldIsVisibleOnBothPageBackgrounds() {
-        // Фон — украшение, WCAG 1.4.11 к нему не относится. Но если звёзды не видно
+        // Фон - украшение, WCAG 1.4.11 к нему не относится. Но если звёзды не видно
         // совсем, фон не выполняет своей задачи: раньше палитра была одна на обе темы,
-        // и на `#FAFAFA` белые звёзды просто исчезали. Порог здесь 3:1 — не требование
+        // и на `#FAFAFA` белые звёзды просто исчезали. Порог здесь 3:1 - не требование
         // нормы, а проверка «фон существует».
         schemes.forEach { (name, s) ->
             val page = s.page()
@@ -224,10 +224,10 @@ class ContrastTest {
 
     @Test
     fun outlineTokenIsUsableAsARealBorder() {
-        // Смысл разделения токенов: `outline` — смысловая граница (3:1), а
-        // `outlineVariant` — декоративная и 3:1 не обязана достигать. Если бы в
+        // Смысл разделения токенов: `outline` - смысловая граница (3:1), а
+        // `outlineVariant` - декоративная и 3:1 не обязана достигать. Если бы в
         // `outline` попал слабый цвет, подставили бы его и рамку поля, и рамку
-        // кнопки, и чипа — молча, без падения теста. Этот тест ловит именно
+        // кнопки, и чипа - молча, без падения теста. Этот тест ловит именно
         // подмену токена, а не конкретный компонент.
         schemes.forEach { (name, s) ->
             assertNonText(contrastOver(s.outline, s.page()), "токен outline", name)

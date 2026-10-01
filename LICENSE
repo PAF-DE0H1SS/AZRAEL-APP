@@ -1,4 +1,4 @@
-AZRAEL-APP — DUAL LICENSING TERMS
+AZRAEL-APP - DUAL LICENSING TERMS
 
 Software: AZRAEL-APP (the "Software"), a Compose Multiplatform client application for the AZRAEL Lab platform, together with all source code, binaries, documentation, build files and associated material.
 
@@ -6,7 +6,7 @@ Licensor / Rights Holder: azrael (PAF-DE0H1SS) · AZRAEL Lab · <typ.onepatop@gm
 
 Effective date of these terms: the date on which the Software is first released publicly.
 
-PART 0. OVERVIEW — HYBRID DUAL LICENSING
+PART 0. OVERVIEW - HYBRID DUAL LICENSING
 
 The Software is distributed under a hybrid dual-licensing scheme. Licensees are bound by both parts set out below, depending on the nature of their use:
 
@@ -29,7 +29,7 @@ The Licensor retains, in perpetuity and to the exclusion of all others, the excl
 
 (b) grant commercial licenses to third parties, on such terms as the Licensor alone determines.
 
-No Licensee or third party may engage in any commercial use of the Software or any part of it — directly or indirectly, structurally or materially — without a prior written commercial agreement with the Licensor. This prohibition is absolute and admits no implied exceptions, including any use "not substantial in relation to the whole", internal corporate use, or use in the course of paid employment.
+No Licensee or third party may engage in any commercial use of the Software or any part of it - directly or indirectly, structurally or materially - without a prior written commercial agreement with the Licensor. This prohibition is absolute and admits no implied exceptions, including any use "not substantial in relation to the whole", internal corporate use, or use in the course of paid employment.
 
 "Commercial use" means any use intended for, directed toward, or reasonably capable of producing, directly or indirectly, a financial or commercial benefit, including but not limited to: sale or licensing of the Software or derivative works; paid software-as-a-service; hosting for third parties for consideration; advertising or monetized traffic; use in a commercial organization's internal operations where the result confers an economic advantage; and the incorporation of the Software into any product or service offered for compensation.
 
@@ -37,7 +37,7 @@ No Licensee or third party may engage in any commercial use of the Software or a
 
 Nothing in these terms shall be construed as granting any Licensee any right, title, interest or license other than the explicit, limited grants set out herein. The Licensor reserves all rights not expressly granted.
 
-PART 2. FORKS AND DERIVATIVE WORKS — REVENUE SHARE
+PART 2. FORKS AND DERIVATIVE WORKS - REVENUE SHARE
 
 Any Licensee who creates a fork, derivative work, modification, port, wrapper, or substantially derived product (each a "Derivative") of the Software agrees, by the act of doing so, to the terms of this Part 2.
 
@@ -67,19 +67,19 @@ The base royalty payable to the Licensor shall be no less than 50% (fifty percen
 
 The obligations of this Part 2 survive the termination of any license, the discontinuation of the Software, and the transfer or assignment of any rights or obligations by the Licensee, including through bankruptcy, liquidation or dissolution of the Licensee.
 
-PART 3. BACK-FEED CLAUSE — AUTOMATIC ASSIGNMENT OF IMPROVEMENTS AND CONTRIBUTIONS (CLA)
+PART 3. BACK-FEED CLAUSE - AUTOMATIC ASSIGNMENT OF IMPROVEMENTS AND CONTRIBUTIONS (CLA)
 
 To protect the integrity of the Software and prevent fragmentation of the codebase, this Part 3 imposes a mandatory, non-waivable back-feed of rights to the Licensor.
 
 3.1 Automatic assignment of Improvements
 
-All Improvements — meaning any and all modifications, enhancements, corrections, fixes, patches, optimizations, new features, modules, adaptations, translations, ports, and derivative works of any kind created by any Licensee based on, derived from, or in connection with the Software — are hereby automatically, irrevocably and without any payment or other compensation assigned to the Licensor as of the moment of their creation, to the fullest extent permitted by law. This assignment includes all copyright, database rights, and any other intellectual property rights capable of assignment, together with the exclusive right to sublicense, commercialize, register and enforce such rights in every territory.
+All Improvements - meaning any and all modifications, enhancements, corrections, fixes, patches, optimizations, new features, modules, adaptations, translations, ports, and derivative works of any kind created by any Licensee based on, derived from, or in connection with the Software - are hereby automatically, irrevocably and without any payment or other compensation assigned to the Licensor as of the moment of their creation, to the fullest extent permitted by law. This assignment includes all copyright, database rights, and any other intellectual property rights capable of assignment, together with the exclusive right to sublicense, commercialize, register and enforce such rights in every territory.
 
 3.2 Right of integration
 
 The Licensor shall have the unconditional, perpetual and worldwide right to copy, import, merge, adapt and incorporate any Improvement published in any public repository (including forks hosted on GitHub or any other platform), and any code embodied therein, into the main development line of the Software and into any commercial or closed editions thereof, without any payment, attribution, notice or obligation of any kind to the creator of the Improvement.
 
-3.3 Contributions — express assignment (CLA)
+3.3 Contributions - express assignment (CLA)
 
 By submitting code to the Software's main repository through a pull request, patch, issue-fix, mailing list, forum or any other channel (a "Contribution"), the contributor represents, warrants and confirms that:
 
@@ -95,7 +95,7 @@ By submitting code to the Software's main repository through a pull request, pat
 
 The assignments and waivers in this Part 3 are irrevocable, perpetual, worldwide and survive the termination of any license, the death or winding-up of a natural or legal Licensee, and any transfer of the Software to a successor in title.
 
-PART 4. FULL TEXT — POLYFORM NONCOMMERCIAL LICENSE 1.0.0
+PART 4. FULL TEXT - POLYFORM NONCOMMERCIAL LICENSE 1.0.0
 
 PolyForm Noncommercial License 1.0.0
 

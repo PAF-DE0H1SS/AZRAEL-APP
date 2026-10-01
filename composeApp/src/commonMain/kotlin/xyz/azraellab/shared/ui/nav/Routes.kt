@@ -30,7 +30,7 @@ enum class TabSpec(
     companion object {
         /**
          * Индекс по **всем** [tabIds], а не только по каноническому [tabId]:
-         * `vpn_tab` — это то, что шлёт текущий сервер, а `vpn` приходит от старых
+         * `vpn_tab` - это то, что шлёт текущий сервер, а `vpn` приходит от старых
          * установок и от ручных ссылок. Раньше алиас знал [labelKey]-разбор, но не
          * знал навигация, и `azrael://vpn` уходил в [Destination.Placeholder] вместо
          * раздела VPN.
@@ -61,7 +61,7 @@ sealed interface Destination {
 
     /**
      * Раздел с сервера, которого нет в [TabSpec]. Показывается заглушкой с
-     * настоящим id — так видно расхождение с сервером, вместо тихого пустого экрана.
+     * настоящим id - так видно расхождение с сервером, вместо тихого пустого экрана.
      */
     data class Placeholder(val tabId: String) : Destination
 
@@ -69,7 +69,7 @@ sealed interface Destination {
      * Вкладка, в которую надо вернуться по «назад» из этого пункта.
      *
      * Раньше здесь стоял безусловный `TabSpec.Messages` для любого [Detail], и
-     * `azrael://settings/devices` уводил в «Сообщения» — по кнопке «назад» из
+     * `azrael://settings/devices` уводил в «Сообщения» - по кнопке «назад» из
      * экрана настройки пользователь попадал не туда. Родитель теперь выводится из
      * [DetailKind], а не из типа контейнера.
      */
@@ -93,15 +93,15 @@ sealed interface Destination {
     }
 }
 
-/** Подэкраны, которые появятся в P2–P4. Идентификаторы стабильны: на них ссылается back-stack. */
+/** Подэкраны, которые появятся в P2-P4. Идентификаторы стабильны: на них ссылается back-stack. */
 enum class DetailKind(val argRequired: Boolean) {
-    /** Открытый диалог в разделе «Сообщения»; [Destination.arg] — id чата. */
+    /** Открытый диалог в разделе «Сообщения»; [Destination.arg] - id чата. */
     ChatRoom(true),
 
     /** Внутренний раздел «Сообщений» с AI-чатом. */
     AiChat(false),
 
-    /** Экран настроек; [Destination.arg] — id настройки для deep link. */
+    /** Экран настроек; [Destination.arg] - id настройки для deep link. */
     Setting(false)
 }
 
@@ -117,10 +117,10 @@ fun parseDestination(raw: String): Destination? {
     if (arg != null && arg.any { it == '/' }) return null
     val spec = TabSpec.fromTabId(tabId) ?: return Destination.Placeholder(tabId)
     // Аргумент несёт смысл только у подэкранов: у «Сообщений» это id чата, у
-    // «Настроек» — id конкретной настройки. Раздел без аргумента — это сам
-    // раздел, поэтому `settings` открывает список настроек, а `settings/devices` —
+    // «Настроек» - id конкретной настройки. Раздел без аргумента - это сам
+    // раздел, поэтому `settings` открывает список настроек, а `settings/devices` -
     // сразу нужный экран. Права проверяет `openDeepLink`, они одинаковы в обоих
-    // случаях (`parentTab()` у обоих — Settings).
+    // случаях (`parentTab()` у обоих - Settings).
     val detail = when {
         spec == TabSpec.Messages && arg != null -> Destination.Detail(DetailKind.ChatRoom, arg)
         spec == TabSpec.Settings && arg != null -> Destination.Detail(DetailKind.Setting, arg)
@@ -129,6 +129,6 @@ fun parseDestination(raw: String): Destination? {
     return detail
 }
 
-// `parentTab()` и `scrollKey()` — члены `Destination`, а не top-level расширения:
+// `parentTab()` и `scrollKey()` - члены `Destination`, а не top-level расширения:
 // пунктов назначения мало и они всегда нужны вместе с самим пунктом, а отдельные
 // функции легко забыть импортировать и получить «Unresolved reference» в `when`.

@@ -68,7 +68,7 @@ actual object Crypto {
         )
     }
 
-    /** Общий секрет по raw-32 ключам: приватный оборачиваем в PKCS8, публичный — big-endian. */
+    /** Общий секрет по raw-32 ключам: приватный оборачиваем в PKCS8, публичный - big-endian. */
     actual fun x25519SharedRaw(privKey: ByteArray, pubKey: ByteArray): ByteArray {
         val kf = KeyFactory.getInstance("X25519")
         val privSpec = PKCS8EncodedKeySpec(concatBytes(PKCS8_X25519, privKey))

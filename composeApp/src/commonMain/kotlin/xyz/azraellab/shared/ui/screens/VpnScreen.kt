@@ -360,7 +360,7 @@ internal fun VpnView(client: AppClient, scrolls: ScrollPositions) {
                 }
             }
             platforms.forEach { p ->
-                Text("${p.name} — ${p.filename}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f))
+                Text("${p.name} - ${p.filename}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f))
             }
         }
         }

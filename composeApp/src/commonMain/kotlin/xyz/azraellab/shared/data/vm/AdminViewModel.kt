@@ -14,7 +14,7 @@ import xyz.azraellab.shared.data.model.InviteSummaryDto
 
 /**
  * Владeльческий раздел «Админ»: заморозка/разморозка, приглашения и статус канала.
- * Сетевые списки живут в StateFlow, однократные действия — suspend-функции.
+ * Сетевые списки живут в StateFlow, однократные действия - suspend-функции.
  */
 class AdminViewModel(
     private val client: AppClient,

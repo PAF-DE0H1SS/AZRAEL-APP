@@ -19,7 +19,7 @@ import xyz.azraellab.shared.data.UiState
  * `rememberViewModel` при уходе с экрана). Внешний scope можно подсунуть в тестах,
  * чтобы контролировать жизненный цикл.
  *
- * Тип состояния экрана — [UiState] (Loading/Ready/Error), загрузки выполняется через
+ * Тип состояния экрана - [UiState] (Loading/Ready/Error), загрузки выполняется через
  * [loadInto], чтобы путь load -> data/error был единым и типизированным.
  */
 open class AppViewModel(private val externalScope: CoroutineScope? = null) {

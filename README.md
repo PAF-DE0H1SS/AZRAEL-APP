@@ -2,22 +2,22 @@
 
 # 🛰️ AZRAEL-APP
 
-**A cross-platform client for the [azrael-lab.xyz](https://azrael-lab.xyz/) platform** — one shared UI, three platforms.
+**A cross-platform client for the [azrael-lab.xyz](https://azrael-lab.xyz/) platform** - one shared UI, three platforms.
 
 [![Platform: Android 13+](https://img.shields.io/badge/Android-13%2B-3DDC84?style=flat&logo=android&logoColor=white)](https://github.com/PAF-DE0H1SS/AZRAEL-APP/releases)
 [![Platform: Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D6?style=flat&logo=windows&logoColor=white)](https://github.com/PAF-DE0H1SS/AZRAEL-APP/releases)
 [![Platform: Linux](https://img.shields.io/badge/Linux-deb%20%E2%94%82%20PKGBUILD%20%E2%94%82%20flake-FCC624?style=flat&logo=linux&logoColor=black)](https://github.com/PAF-DE0H1SS/AZRAEL-APP/releases)
 [![Made with Kotlin](https://img.shields.io/badge/Made%20with-Kotlin-7F52FF?style=flat&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Compose Multiplatform](https://img.shields.io/badge/UI-Compose%20Multiplatform-4285F4?style=flat&logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
-[![License: Dual — PolyForm NC 1.0.0](https://img.shields.io/badge/License-Dual%20%E2%80%94%20PolyForm%20NC%201.0.0-red?style=flat)](LICENSE)
+[![License: Dual - PolyForm NC 1.0.0](https://img.shields.io/badge/License-Dual%20%E2%80%94%20PolyForm%20NC%201.0.0-red?style=flat)](LICENSE)
 [![CI: auto-build](https://img.shields.io/github/actions/workflow/status/PAF-DE0H1SS/AZRAEL-APP/build.yml?branch=develop&style=flat&label=CI%20auto-build)](https://github.com/PAF-DE0H1SS/AZRAEL-APP/actions)
 
 </div>
 
 > [!IMPORTANT]
-> **Status: active development.** The app is in an early stage (WIP) — it may **not work at all** or work with bugs and glitches.
+> **Status: active development.** The app is in an early stage (WIP) - it may **not work at all** or work with bugs and glitches.
 
-AZRAEL-APP is a small cross-platform application built with **Compose Multiplatform**. It connects to and interacts with the [azrael-lab.xyz](https://azrael-lab.xyz/) project. The same Compose UI is shared between the native Android build and the desktop builds — the native layer (C++/JNI) lives in `app`, the shared UI in `composeApp`, and the desktop wrapper in `desktopApp`.
+AZRAEL-APP is a small cross-platform application built with **Compose Multiplatform**. It connects to and interacts with the [azrael-lab.xyz](https://azrael-lab.xyz/) project. The same Compose UI is shared between the native Android build and the desktop builds - the native layer (C++/JNI) lives in `app`, the shared UI in `composeApp`, and the desktop wrapper in `desktopApp`.
 
 ---
 
@@ -29,11 +29,11 @@ AZRAEL-APP is a small cross-platform application built with **Compose Multiplatf
 ### ✨ Overview
 
 > [!NOTE]
-> **Supported platforms** — same codebase, three delivery formats:
+> **Supported platforms** - same codebase, three delivery formats:
 
 | 🖥️ Platform | 📦 Delivery | 🗂️ Format |
 |---|---|---|
-| 📱 **Android 13+** | APK — debug & release | `.apk` |
+| 📱 **Android 13+** | APK - debug & release | `.apk` |
 | 🖥️ **Windows 10/11** | MSI installer | `.msi` |
 | 🐧 **Linux** | Ubuntu / Debian · Arch · NixOS | `.deb` · `PKGBUILD` · `flake` |
 
@@ -48,7 +48,7 @@ flowchart LR
     G["⚙️ GitHub Actions"] --> D & E
 ```
 
-The C++/native bridge stays **Android-only**; the desktop build uses a platform-aware fallback — the UI is fully shared.
+The C++/native bridge stays **Android-only**; the desktop build uses a platform-aware fallback - the UI is fully shared.
 
 ### 🔨 Build
 
@@ -135,16 +135,16 @@ makepkg -si
 
 | Branch | Purpose |
 |---|---|
-| `main` | **stable** — released |
+| `main` | **stable** - released |
 | `develop` | integration |
 | `feature/*`, `release/*`, `hotfix/*` | as needed |
 
 ### 📄 License
 
-Distributed under **hybrid dual licensing** — see [LICENSE](LICENSE):
+Distributed under **hybrid dual licensing** - see [LICENSE](LICENSE):
 
 - **Noncommercial use** → [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) (full text in Part 4)
-- **Forks / monetization** → author terms (Parts 1–3): revenue share **≥ 50%**, back-feed clause, CLA
+- **Forks / monetization** → author terms (Parts 1-3): revenue share **≥ 50%**, back-feed clause, CLA
 
 Commercial use requires a written agreement with the author: <typ.onepatop@gmail.com>.
 
@@ -156,11 +156,11 @@ Commercial use requires a written agreement with the author: <typ.onepatop@gmail
 ### ✨ Обзор
 
 > [!NOTE]
-> **Поддерживаемые платформы** — одна кодовая база, три формата поставки:
+> **Поддерживаемые платформы** - одна кодовая база, три формата поставки:
 
 | 🖥️ Платформа | 📦 Поставка | 🗂️ Формат |
 |---|---|---|
-| 📱 **Android 13+** | APK — debug и release | `.apk` |
+| 📱 **Android 13+** | APK - debug и release | `.apk` |
 | 🖥️ **Windows 10/11** | установщик MSI | `.msi` |
 | 🐧 **Linux** | Ubuntu / Debian · Arch · NixOS | `.deb` · `PKGBUILD` · `flake` |
 
@@ -175,7 +175,7 @@ flowchart LR
     G["⚙️ GitHub Actions"] --> D & E
 ```
 
-Нативный слой C++/JNI остаётся **только для Android**; desktop-сборка использует fallback — UI полностью общий.
+Нативный слой C++/JNI остаётся **только для Android**; desktop-сборка использует fallback - UI полностью общий.
 
 ### 🔨 Сборка
 
@@ -262,16 +262,16 @@ makepkg -si
 
 | Ветка | Назначение |
 |---|---|
-| `main` | **стабильная** — релизная |
+| `main` | **стабильная** - релизная |
 | `develop` | интеграционная |
 | `feature/*`, `release/*`, `hotfix/*` | по ситуации |
 
 ### 📄 Лицензия
 
-Распространяется по **гибридному двойному лицензированию** — см. [LICENSE](LICENSE):
+Распространяется по **гибридному двойному лицензированию** - см. [LICENSE](LICENSE):
 
 - **Некоммерческое использование** → [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) (полный текст в Части 4)
-- **Форки / монетизация** → условия автора (Части 1–3): revenue share **от 50%**, back-feed clause, CLA
+- **Форки / монетизация** → условия автора (Части 1-3): revenue share **от 50%**, back-feed clause, CLA
 
 Коммерческое использование требует письменного договора с автором: <typ.onepatop@gmail.com>.
 
@@ -283,11 +283,11 @@ makepkg -si
 ### ✨ 概述
 
 > [!NOTE]
-> **支持的平台** — 同一套代码，三种交付格式：
+> **支持的平台** - 同一套代码，三种交付格式：
 
 | 🖥️ 平台 | 📦 交付 | 🗂️ 格式 |
 |---|---|---|
-| 📱 **Android 13+** | APK — debug 与 release | `.apk` |
+| 📱 **Android 13+** | APK - debug 与 release | `.apk` |
 | 🖥️ **Windows 10/11** | MSI 安装包 | `.msi` |
 | 🐧 **Linux** | Ubuntu / Debian · Arch · NixOS | `.deb` · `PKGBUILD` · `flake` |
 
@@ -302,7 +302,7 @@ flowchart LR
     G["⚙️ GitHub Actions"] --> D & E
 ```
 
-原生层 C++/JNI 仅用于 **Android**；桌面版使用平台回退——UI 完全共享。
+原生层 C++/JNI 仅用于 **Android**；桌面版使用平台回退--UI 完全共享。
 
 ### 🔨 构建
 
@@ -389,16 +389,16 @@ makepkg -si
 
 | 分支 | 用途 |
 |---|---|
-| `main` | **稳定版** — 已发布 |
+| `main` | **稳定版** - 已发布 |
 | `develop` | 集成分支 |
 | `feature/*`、`release/*`、`hotfix/*` | 按需使用 |
 
 ### 📄 许可证
 
-采用**混合双重许可**发布 — 见 [LICENSE](LICENSE)：
+采用**混合双重许可**发布 - 见 [LICENSE](LICENSE)：
 
 - **非商业用途** → [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)（完整文本见第 4 部分）
-- **分支 / 商业变现** → 作者条款（第 1–3 部分）：收益分成不低于 **50%**、回馈条款（Back-feed）、CLA
+- **分支 / 商业变现** → 作者条款（第 1-3 部分）：收益分成不低于 **50%**、回馈条款（Back-feed）、CLA
 
 商业使用需与作者签订书面协议：<typ.onepatop@gmail.com>。
 

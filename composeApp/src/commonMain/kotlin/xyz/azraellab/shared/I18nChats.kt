@@ -2,12 +2,12 @@ package xyz.azraellab.shared
 
 // ------------------------------------------------------------------------------
 // Словари домена «Чаты и AI-чат» (RU/EN/ZH). Текст самих карт не менялся,
-// переводятся только имена деклараций (см. I18n.kt — прокси-декларации).
+// переводятся только имена деклараций (см. I18n.kt - прокси-декларации).
 
 internal val CHATS_RU = mapOf(
     "chats.title" to "Диалоги",
     "chats.none" to "Диалогов нет",
-    "chats.none.hint" to "Диалогов нет — начните с поиска пользователя выше.",
+    "chats.none.hint" to "Диалогов нет - начните с поиска пользователя выше.",
     "chats.select" to "Выберите диалог слева",
     "chats.count" to "Диалогов: {0}",
     "chats.new" to "Новый диалог: найти пользователя",
@@ -64,7 +64,7 @@ internal val CHATS_RU = mapOf(
     "ai.thinking" to "AI думает…",
     "ai.request" to "Запрос к модели…",
     "ai.emptyAnswer" to "(пустой ответ)",
-    "ai.history.empty" to "История AI-чатов пуста — задайте первый вопрос ниже",
+    "ai.history.empty" to "История AI-чатов пуста - задайте первый вопрос ниже",
     "ai.history.emptyParens" to "(пусто)",
     "ai.copyAnswer" to "Скопировать ответ",
     "ai.copied" to "Ответ скопирован",
@@ -75,7 +75,7 @@ internal val CHATS_RU = mapOf(
 internal val CHATS_EN = mapOf(
     "chats.title" to "Chats",
     "chats.none" to "No chats",
-    "chats.none.hint" to "No chats — start by searching for a user above.",
+    "chats.none.hint" to "No chats - start by searching for a user above.",
     "chats.select" to "Pick a chat on the left",
     "chats.count" to "Chats: {0}",
     "chats.new" to "New chat: find a user",
@@ -132,7 +132,7 @@ internal val CHATS_EN = mapOf(
     "ai.thinking" to "AI is thinking…",
     "ai.request" to "Requesting the model…",
     "ai.emptyAnswer" to "(empty answer)",
-    "ai.history.empty" to "The AI chat history is empty — ask your first question below",
+    "ai.history.empty" to "The AI chat history is empty - ask your first question below",
     "ai.history.emptyParens" to "(empty)",
     "ai.copyAnswer" to "Copy the answer",
     "ai.copied" to "Answer copied",
@@ -143,7 +143,7 @@ internal val CHATS_EN = mapOf(
 internal val CHATS_ZH = mapOf(
     "chats.title" to "对话",
     "chats.none" to "暂无对话",
-    "chats.none.hint" to "暂无对话 — 请从上方搜索用户开始。",
+    "chats.none.hint" to "暂无对话 - 请从上方搜索用户开始。",
     "chats.select" to "请在左侧选择对话",
     "chats.count" to "对话：{0}",
     "chats.new" to "新对话：查找用户",
@@ -200,7 +200,7 @@ internal val CHATS_ZH = mapOf(
     "ai.thinking" to "AI 正在思考…",
     "ai.request" to "正在请求模型…",
     "ai.emptyAnswer" to "（空回复）",
-    "ai.history.empty" to "AI 聊天记录为空 — 请在下方提出第一个问题",
+    "ai.history.empty" to "AI 聊天记录为空 - 请在下方提出第一个问题",
     "ai.history.emptyParens" to "（空）",
     "ai.copyAnswer" to "复制回复",
     "ai.copied" to "回复已复制",

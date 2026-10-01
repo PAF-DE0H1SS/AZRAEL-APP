@@ -7,10 +7,10 @@ import xyz.azraellab.shared.core.crypto.randomBytes
 /**
  * Защищённый конверт кастомного API (программа ↔ сайт, поверх HTTPS):
  *
- * 1. Шифрование тела — AES-256-GCM по ключу приложения [AppKey] (AAD привязывает ts|nonce).
- * 2. Подпись запроса — HMAC-SHA256("V1|ts|nonce|b64(sha256(ct))").
- * 3. Anti-replay — одноразовый nonce, который сервер погашает через Redis SETNX, + окно ts ±120с.
- * 4. Двусторонняя аутентификация — сайт подписывает ответ тем же ключом, клиент проверяет.
+ * 1. Шифрование тела - AES-256-GCM по ключу приложения [AppKey] (AAD привязывает ts|nonce).
+ * 2. Подпись запроса - HMAC-SHA256("V1|ts|nonce|b64(sha256(ct))").
+ * 3. Anti-replay - одноразовый nonce, который сервер погашает через Redis SETNX, + окно ts ±120с.
+ * 4. Двусторонняя аутентификация - сайт подписывает ответ тем же ключом, клиент проверяет.
  */
 object AppSecure {
     const val VERSION = 1
@@ -28,7 +28,7 @@ object AppSecure {
     const val HDR_KID = "x-azrael-kid"
 
     // Трёхсторонний конверт (L2): клиент ↔ сайт ↔ внутренний роут /v2/l2.
-    const val HDR_L2 = "x-azrael-l2"           // "1" — запрос требует вскрытия на внутреннем слое
+    const val HDR_L2 = "x-azrael-l2"           // "1" - запрос требует вскрытия на внутреннем слое
     const val HDR_EPH = "x-azrael-eph"         // raw-32 X25519 баз64 публичный эфемерный ключ клиента
 
     // Авторизация установки: Ed25519-подпись raw-текста тела (заголовки кастомного API).
@@ -36,7 +36,7 @@ object AppSecure {
     const val HDR_DEV_TS = "x-azrael-dev-ts"
     const val HDR_DEV_SIG = "x-azrael-dev-sig"
 
-    // Серверное время в КАЖДОМ ответе — для синхронизации часов клиента (x-azrael-srv-ts).
+    // Серверное время в КАЖДОМ ответе - для синхронизации часов клиента (x-azrael-srv-ts).
     const val SRV_TS = "x-azrael-srv-ts"
 
     const val RESP_TS = "x-azrael-resp-ts"
@@ -59,7 +59,7 @@ object AppSecure {
     /**
      * Ключ поколения g (зеркало сервера): K(g) = HMAC-SHA256(anchor, "AZRAEL-APP|gen|g|s=salt").
      * Для g=1 без соли K(1) = якорь (обратная совместимость). Соль следующего поколения
-     * клиент получает ТОЛЬКО из подписанного ответа (RESP_ROT_*) — украденный
+     * клиент получает ТОЛЬКО из подписанного ответа (RESP_ROT_*) - украденный
      * промежуточный ключ не позволяет выводить будущие поколения вперёд.
      */
     fun deriveGenerationKey(anchor: ByteArray, g: Long, saltB64: String): ByteArray {
@@ -68,7 +68,7 @@ object AppSecure {
         return Crypto.hmacSha256(anchor, msg)
     }
 
-    /** Проверка маркеров «отравления» в ответе: poison/trap — вызов защиты. */
+    /** Проверка маркеров «отравления» в ответе: poison/trap - вызов защиты. */
     fun isResponsePoisoned(resp: xyz.azraellab.shared.core.protocol.HttpResult): Boolean {
         return resp.headers[RESP_POISON] == "1" || resp.headers[RESP_TRAP] == "1"
     }
@@ -96,7 +96,7 @@ object AppSecure {
 
     /**
      * Продвинутая печать с фиксированными ts и nonce: нужна трёхстороннему конверту
-     * (L2), где nonce обязан быть известен ДО сборки inner-аргументов, а время — общим
+     * (L2), где nonce обязан быть известен ДО сборки inner-аргументов, а время - общим
      * для всех слоёв. Вызывающий обязан передавать криптостойкий уникальный nonce.
      */
     fun seal(key: ByteArray, plainJson: String, ts: Long, nonce: String): SealedRequest {

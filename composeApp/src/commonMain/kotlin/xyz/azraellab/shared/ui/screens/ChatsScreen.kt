@@ -183,7 +183,7 @@ import xyz.azraellab.shared.ui.vm.rememberViewModel
 /**
  * Раздел «Сообщения»: список диалогов, AI-чат и открытая комната.
  *
- * Комната — это `Destination.Detail(ChatRoom)`, а не локальное состояние, иначе
+ * Комната - это `Destination.Detail(ChatRoom)`, а не локальное состояние, иначе
  * «назад» её не закрывал бы, а ссылка `azrael://messages/42` открывала бы просто
  * раздел. На широком экране список остаётся слева (переключение комнаты по клику),
  * на узком комната занимает весь экран, а её кнопка «назад» уходит в back-stack.
@@ -374,10 +374,10 @@ private fun ChatsListSection(
                             Box(
                                 modifier = Modifier.background(MaterialTheme.colorScheme.error, CircleShape).padding(horizontal = 8.dp, vertical = 2.dp)
                             // Счётчик лежит на сплошной заливке `error`, и пара «заливка + цифра»
-                            // обязана быть именно смысловой — это единственное, что читается
+                            // обязана быть именно смысловой - это единственное, что читается
                             // без подписи. Раньше здесь стоял `Color.White`: на тёмной схеме
                             // белый даёт 3.67:1, то есть цифра в счётчике непрочитываема.
-                            // `onError` — материаловский «текст поверх danger» и даёт 5.03:1.
+                            // `onError` - материаловский «текст поверх danger» и даёт 5.03:1.
                             ) { Text("${c.unread}", color = MaterialTheme.colorScheme.onError, style = MaterialTheme.typography.labelSmall) }
                         }
                     }
@@ -440,7 +440,7 @@ private fun ChatsListSection(
 }
 
 /**
- * Открытый диалог — отдельный экран, а не хвост списка.
+ * Открытый диалог - отдельный экран, а не хвост списка.
  *
  * Раньше список и комната жили в одной `Column` и переключались условием
  * `openId == null`: на широком экране это означало, что комната занимала место
@@ -461,7 +461,7 @@ private fun ChatRoomSection(
     val room = roomState.getOrNull()
     val msgs = room?.msgs ?: emptyList()
     // Имя приходит из списка диалогов; если там этого чата нет (архив, чат удалён
-    // между загрузкой списка и открытием) — показываем нейтральный заголовок,
+    // между загрузкой списка и открытием) - показываем нейтральный заголовок,
     // а не пустую строку.
     val name = room?.name?.takeIf { it.isNotBlank() } ?: t["chats.room.title"]
     val days = room?.days

@@ -187,7 +187,7 @@ import xyz.azraellab.shared.ui.vm.rememberViewModel
 // Дубли data/Json.kt. Раньше здесь стояло `this[key]?.jsonPrimitive?.content`, что
 // бросает IllegalArgumentException, если сервер прислал на месте строки объект или
 // массив: `jsonPrimitive` на не-primitive не optional. `as?` вместо `.jsonPrimitive`
-// даёт на не-primitive null вместо исключения — то же самое, что в data/Json.kt, и
+// даёт на не-primitive null вместо исключения - то же самое, что в data/Json.kt, и
 // тот же набор расширений; менять надо оба сразу.
 private fun JsonObject.primOrNull(key: String): JsonPrimitive? = this[key] as? JsonPrimitive
 
@@ -245,7 +245,7 @@ data class AppProfile(
     val autoDeleteDays: Int?,
     val tgBound: Boolean,
     val tgUsername: String?,
-    /** Язык аккаунта (users.lang) — общий для сайта и всех устройств. */
+    /** Язык аккаунта (users.lang) - общий для сайта и всех устройств. */
     val lang: String?
 )
 
@@ -265,7 +265,7 @@ internal fun parseProfile(o: JsonObject): AppProfile = AppProfile(
 )
 
 /**
- * Локальная подпись таба: сервер присылает русские label'ы (/main — русский UI),
+ * Локальная подпись таба: сервер присылает русские label'ы (/main - русский UI),
  * поэтому переводим по id, а серверный label оставляем запасным для новых табов.
  */
 /** Локализуем id раздела, но только если он есть в приложении: иначе берём серверную строку. */
@@ -294,7 +294,7 @@ internal fun parseTabs(cfg: JsonObject?): List<ServerTab> {
 /**
  * Цвет роли в конкретной схеме. Раньше здесь стояли зашитые литералы и токены
  * тёмной палитры: на светлой теме «золото» и «янтарь» превращались в блёклые
- * пятна, а обычная роль вообще не читалась. Роли — это смысловые слоты темы,
+ * пятна, а обычная роль вообще не читалась. Роли - это смысловые слоты темы,
  * поэтому берём их из [ColorScheme], а не из палитры.
  */
 internal fun roleColor(role: String, scheme: ColorScheme): Color = when (role) {
@@ -310,7 +310,7 @@ internal fun roleColor(role: String): Color = roleColor(role, MaterialTheme.colo
 
 /**
  * Текст ошибки для показа пользователю. Русские формулировки сервера приходят
- * в e.message — их не переводим (иначе получим «Ошибка заполнения — Введите
+ * в e.message - их не переводим (иначе получим «Ошибка заполнения - Введите
  * код»), поэтому для известных случаев берём свою строку по коду.
  */
 internal fun errText(e: Throwable): String = if (e is AppException) {
@@ -333,10 +333,10 @@ internal fun errText(e: Throwable): String = if (e is AppException) {
         val detail = e.message?.trim().orEmpty()
         // Для кодов L2 detail не дописываем: серверные тексты там технические
         // и английские ('l2 gateway error'), а своя строка уже объясняет причину
-        // и что делать. Остальные коды оставляем как есть — потеря контекста
-        // сервера полезнее, чем «Ошибка 204 — validation failed».
+        // и что делать. Остальные коды оставляем как есть - потеря контекста
+        // сервера полезнее, чем «Ошибка 204 - validation failed».
         if (e.code == AppErrorCode.L2_REQUIRED || e.code == AppErrorCode.L2_UNAVAILABLE) base
-        else if (detail.isEmpty() || detail == "err=${e.code}") base else "$base — $detail"
+        else if (detail.isEmpty() || detail == "err=${e.code}") base else "$base - $detail"
     }
 } else {
     t("error.crash", e.message)

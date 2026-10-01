@@ -1,7 +1,7 @@
-# AZRAEL-APP: рабочая память — P2 «декларативные настройки» (handoff)
+# AZRAEL-APP: рабочая память - P2 «декларативные настройки» (handoff)
 
 Статус: **в работе**. Создан для постоянного хранения состояния сессии (не в /tmp).
-Обновляется по мере выполнения; финальный актуальный источник — `docs/ui-redesign-plan.md`.
+Обновляется по мере выполнения; финальный актуальный источник - `docs/ui-redesign-plan.md`.
 
 ## 0. Как возобновить сессию
 1. Прочитать этот файл целиком.
@@ -9,7 +9,7 @@
 3. Делать TODO-задачи из §6 строго по порядку.
 
 ## 1. Цель и критерий приёмки
-- Переписать `SettingsView` (блок `:2740–3425` в
+- Переписать `SettingsView` (блок `:2740-3425` в
   `composeApp/src/commonMain/kotlin/xyz/azraellab/shared/App.kt`) на модель
   `data/configurable/` (`ConfigurableList`/`ConfigSpec`).
 - Вкладка «Настройки» = меню из 6 разделов + навигация `Detail(Setting, arg)`.
@@ -66,7 +66,7 @@ private fun SettingsView(
   - `AccentButton(t["settings.refreshAccount"]) { onRefreshBoot() }`
   - `Label(t("settings.platform", platformName(), nativeGreeting()))`
 - Языковая карточка: `AppLang.entries`, кнопки
-  `(if (I18n.lang == lang) "• $title" else title)`; в named-лямбре — `if (lang != null) { … }`.
+  `(if (I18n.lang == lang) "• $title" else title)`; в named-лямбре - `if (lang != null) { … }`.
 
 ### Аккаунт (AccountSection)
 - account-карточка: `account.title`, `settings.refreshAccount`, `settings.platform`,
@@ -113,7 +113,7 @@ private fun SettingsView(
 - AutoDelete: `profile.autoDelete`, `profile.autoDelete.hint1` +
   `t("profile.autoDelete.now", autoDeleteState(autoDeleteDays))` (AsDescriptive/DirectText),
   кнопки `off`/`d30s`/`d90`/`d365` → `client.profileAutoDelete(d)` → `chats.autoDelete.off`/
-  `t("chats.autoDelete.in", d)` (`chats.autoDelete.days` — см. App.kt :2125).
+  `t("chats.autoDelete.in", d)` (`chats.autoDelete.days` - см. App.kt :2125).
 - Загрузка: `refreshPrivacy()` = `client.profilePrivacyGet().o("privacy")` →
   `hidden_from_search`, `privacy_who_can_search`, `privacy_who_can_write`.
 
@@ -153,7 +153,7 @@ private fun SettingsView(
 1. **[в работе]** Написать новый блок `SettingsView` в `/tmp/opencode/new_settings.kt`:
    `object SettingId { ACCOUNT/DEVICES/SECURITY/PRIVACY/APPEARANCE/CHANNEL }`, обёртка
    `SettingsView`, `SettingsMenu`, `AccountSection`, `DevicesSection`, `SecuritySection`,
-   `PrivacySection`, `AppearanceSection`, `ChannelSection` — по карте §4.
+   `PrivacySection`, `AppearanceSection`, `ChannelSection` - по карте §4.
    Затем python-splice: `src[:2739]` + new + `src[3425:]` в App.kt.
 2. Wiring `onOpenSetting`: инлайн в MainShell `{ arg -> navigator.open(config,
    DetailKind.Setting, arg) }` → параметр MainContent → call site SettingsView (`arg = null`,
@@ -177,10 +177,10 @@ private fun SettingsView(
 - `DetailKind = { ChatRoom, AiChat, Setting }` (Routes.kt).
 - `rememberSectionScroll(scrolls, "settings"|"settings.$section")`, `ScrollPositions` (NavState.kt).
 - `AzraelCard(modifier, corner, padding = 18.dp, onClick = null, content: ColumnScope.() -> Unit)`
-  — onClick через `Modifier.clickable(onClick)`, дефолтный padding 18.dp НЕ переопределять.
+  - onClick через `Modifier.clickable(onClick)`, дефолтный padding 18.dp НЕ переопределять.
 - `AzraelListTile(title, modifier, subtitle = null, leading, trailing, onClick = null,
   enabled = true, titleColor = null, minHeight = AzraelSpace.touchTarget)`
-  — leading/trailing `(@Composable () -> Unit)?`.
+  - leading/trailing `(@Composable () -> Unit)?`.
 - `AvatarCircle(profile: AppProfile)` :1570; `Label(text)` :3463; `AccentButton(label,
   modifier = Modifier, onClick)` :3468; `GlassCard` :3455.
 - `AppThemeMode` :12-21, `AzraelThemeState` :30-60 (Theme.kt).
@@ -197,7 +197,7 @@ private fun SettingsView(
 ## 9. Техника Kotlin и ограничения
 - В named-lambda (`onSet = {...}`) НЕЛЬЗЯ `return@...` → использовать `if/else`;
   в `else`-ветке `when(section)` передавать `section ?: ""`.
-- `secret=true` для паролей и provisionKey; `otp.code` — `secret=false`.
+- `secret=true` для паролей и provisionKey; `otp.code` - `secret=false`.
 - i18n: **новых ключей не добавлять**; `t(key, vararg)` форма существует (App.kt :1648);
   legacy I18n.kt :1095+ не трогать.
 - Хелперы не удалять: `makeClient` :3429, `fieldColors` :3437, `clickableNoRipple` :3443,
@@ -218,7 +218,7 @@ private fun SettingsView(
   `login.provision.label`, `login.provision.ready`, `login.provision.none`.
 
 ## 11. Прогресс
-- P0 (дизайн-система) — закрыт.
-- P1 (навигация) — закрыт.
+- P0 (дизайн-система) - закрыт.
+- P1 (навигация) - закрыт.
 - P2 (настройки): подготовка 100% (все сигнатуры/границы/i18n проверены),
   сам код нового блока ещё не написан и не вшит.

@@ -54,7 +54,7 @@ fun GlassBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
     // Градиент фона раньше был зашит на тёмную схему (#0C110C → #0A0A0A → #070707),
     // поэтому светлая тема выглядела как «тёмное приложение с чёрным текстом»:
     // схема переключалась, а подложка под ней оставалась тёмной. Теперь края
-    // берутся из самой схемы, и `background` в середине — её собственный цвет.
+    // берутся из самой схемы, и `background` в середине - её собственный цвет.
     val deep = scheme.background
     val top = if (scheme.isDark()) Color(0xFF0C110C) else Color(0xFFF1F6F2)
     val bottom = if (scheme.isDark()) Color(0xFF070707) else Color(0xFFFCFDFC)
@@ -66,7 +66,7 @@ fun GlassBackground(modifier: Modifier = Modifier, content: @Composable BoxScope
         AmbientGlow(color = scheme.primary, size = 460.dp, alpha = 0.10f, Modifier.align(Alignment.TopStart))
         AmbientGlow(color = scheme.primary, size = 380.dp, alpha = 0.06f, Modifier.align(Alignment.TopEnd))
         AmbientGlow(color = scheme.secondary, size = 420.dp, alpha = 0.03f, Modifier.align(Alignment.BottomEnd))
-        // Звёзды и белые кометы как на сайте (/e2) — под контентом, мышь не ловит.
+        // Звёзды и белые кометы как на сайте (/e2) - под контентом, мышь не ловит.
         StarfieldBackground(Modifier.matchParentSize())
         content()
     }
@@ -90,22 +90,22 @@ private fun AmbientGlow(color: Color, size: Dp, alpha: Float, modifier: Modifier
 }
 
 // «Стеклянная» обёртка карточки: скруглённые углы, полупрозрачная заливка с градиентом
-// и тонкая светлая рамка — glassmorphism в духе фирменного стиля.
+// и тонкая светлая рамка - glassmorphism в духе фирменного стиля.
 //
 // Функция стала `@Composable`, потому что заливка и рамка берутся из темы.
-// Раньше дефолты были `AzraelBgCard` (5% белого) и `AzraelBorder` (18% белого) —
+// Раньше дефолты были `AzraelBgCard` (5% белого) и `AzraelBorder` (18% белого) -
 // на тёмной схеме это `surface`/`outline` и выглядело как задумано, на светлой
 // 5% белого по белому фону не даёт вообще ничего: карточка исчезала, оставался
 // только невидимый контур.
 //
 // Рамка берётся из `outlineVariant`, а не из `outline`, и это осознанно. `outline`
-// теперь несут смысловую нагрузку: они нужны там, где граница — элемент управления
+// теперь несут смысловую нагрузку: они нужны там, где граница - элемент управления
 // (рамка `OutlinedTextField`, чипы, фокус), и обязаны держать 3:1. Но `AzraelCard`
-// — пассивная поверхность, а не кнопка, и 18% белого на тёмной схеме давали лишь
-// 1.64:1 — как декоративная волосяная линия. Если бы карточка взяла `outline`, то
+// - пассивная поверхность, а не кнопка, и 18% белого на тёмной схеме давали лишь
+// 1.64:1 - как декоративная волосяная линия. Если бы карточка взяла `outline`, то
 // после усиления `outline` до 3.77:1 она получила бы рамку вдвое плотнее прежней
 // и стала бы самой заметной границей на экране. Поэтому схема разводит две роли:
-// `outline` — значимая граница, `outlineVariant` — декоративная.
+// `outline` - значимая граница, `outlineVariant` - декоративная.
 @Composable
 fun Modifier.glass(
     corner: Dp = AzraelCornerGlass,

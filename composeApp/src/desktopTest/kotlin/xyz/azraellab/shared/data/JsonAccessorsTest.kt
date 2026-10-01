@@ -16,12 +16,12 @@ import xyz.azraellab.shared.o as uiO
 import xyz.azraellab.shared.s as uiS
 
 /**
- * Ответ сервера — это словарь, и ничто в контракте не обещает, что поле
+ * Ответ сервера - это словарь, и ничто в контракте не обещает, что поле
  * `user` придёт объектом, а не строкой. Раньше `jsonPrimitive`/`jsonObject` на
  * таком значении БРОСАЛИ `IllegalArgumentException`, и разбор падал мимо
  * `AppException`: экран падал целиком вместо показа «поля нет».
  *
- * Здесь два почти одинаковых набора хелперов (data/Json.kt и ui/ScreenKit.kt) —
+ * Здесь два почти одинаковых набора хелперов (data/Json.kt и ui/ScreenKit.kt) -
  * проверяем оба, иначе исправление можно откатить в одной копии незаметно.
  */
 class JsonAccessorsTest {
@@ -61,7 +61,7 @@ class JsonAccessorsTest {
         assertNull(o.l("obj"))
         assertFalse(o.b("obj"), "объект не должен читаться как boolean")
         assertFalse(o.b("arr"))
-        assertFalse(o.b("nul"), "JsonNull — это не true")
+        assertFalse(o.b("nul"), "JsonNull - это не true")
         assertNull(o.o("arr"), "массив не является объектом")
         assertNull(o.o("nul"))
         assertNull(o.o("str"))
@@ -78,7 +78,7 @@ class JsonAccessorsTest {
 
     @Test
     fun numericStringsDoNotSilentlyCoerceIntoNumbers() {
-        // Нумерация id приходит строкой, а счётчики — числом. Наоборот путать
+        // Нумерация id приходит строкой, а счётчики - числом. Наоборот путать
         // нельзя: нечисловая строка обязана остаться null, а не «0».
         val o = buildJsonObject { put("v", "не число") }
         assertNull(o.i("v"))
@@ -89,7 +89,7 @@ class JsonAccessorsTest {
     @Test
     fun arrayAccessorIgnoresNonArrayValues() {
         val o = mixed()
-        assertEquals(emptyList(), o.a("obj"), "объект на месте массива — пустой список, не исключение")
+        assertEquals(emptyList(), o.a("obj"), "объект на месте массива - пустой список, не исключение")
         assertEquals(emptyList(), o.a("nul"))
     }
 
@@ -112,7 +112,7 @@ class JsonAccessorsTest {
     @Test
     fun jsonObjOrNullOnlyPassesRealObjects() {
         assertEquals(nested, nested.jsonObjOrNull())
-        assertNull(JsonArray(list).jsonObjOrNull(), "массив — не объект")
+        assertNull(JsonArray(list).jsonObjOrNull(), "массив - не объект")
         assertNull(JsonNull.jsonObjOrNull())
         assertNull(JsonPrimitive("строка").jsonObjOrNull())
     }

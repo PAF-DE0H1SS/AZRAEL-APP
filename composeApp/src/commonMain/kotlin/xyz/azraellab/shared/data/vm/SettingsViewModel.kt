@@ -13,7 +13,7 @@ import xyz.azraellab.shared.data.model.ProvisionInfoDto
 
 /**
  * Раздел «Настройки»: профиль, приватность, устройства, provision-ключ и OTP.
- * Сетевые списки живут в StateFlow, однократные действия — suspend-функции
+ * Сетевые списки живут в StateFlow, однократные действия - suspend-функции
  * поверх [Repos], чтобы экран не знал про HTTP и JsonObject.
  */
 class SettingsViewModel(

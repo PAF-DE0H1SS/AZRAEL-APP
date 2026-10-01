@@ -1,5 +1,5 @@
 {
-  description = "AZRAEL-APP — client for azrael-lab.xyz (Android 13+ / Windows 10/11 / Linux)";
+  description = "AZRAEL-APP - client for azrael-lab.xyz (Android 13+ / Windows 10/11 / Linux)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

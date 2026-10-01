@@ -9,12 +9,12 @@ import kotlin.test.assertTrue
 /**
  * Flight-тест: гоняет REAL GatewayClient против живого шлюза.
  * Включается только если задана env AZRAEL_GATEWAY_URL (локально через SSH-туннель к контейнеру SITE).
- * Без env — тест пропускается (succeeds silently), чтобы CI без сети оставался зелёным.
+ * Без env - тест пропускается (succeeds silently), чтобы CI без сети оставался зелёным.
  *
  * Сценарий:
  *  - guest (без auth): connect → role=guest; hello работает; ai.chat/cmd.ping → отказ (108 → call() вернёт null).
  *  - с AZRAEL_AUTH_TOKEN: connect → role >= standard; cmd.ping работает, возвращает JSON с "pong".
- *  - канал не идемпотентен: повторный connect со старым токеном не требуется — проверяем внутри одной сессии.
+ *  - канал не идемпотентен: повторный connect со старым токеном не требуется - проверяем внутри одной сессии.
  */
 class GatewayFlightTest {
     private fun gatewayUrl(): String? = System.getenv("AZRAEL_GATEWAY_URL")?.takeIf { it.isNotBlank() }
@@ -23,7 +23,7 @@ class GatewayFlightTest {
 
     @Test
     fun guestThenPrivilegedRealGateway() {
-        val base = gatewayUrl() ?: return println("AZRAEL_GATEWAY_URL не задан — flight-тест пропущен (CI без сети)")
+        val base = gatewayUrl() ?: return println("AZRAEL_GATEWAY_URL не задан - flight-тест пропущен (CI без сети)")
         val token = authToken()
         println("[flight] gateway=$base auth=${if (token != null) "given" else "none"}")
 
@@ -65,7 +65,7 @@ class GatewayFlightTest {
             priv.disconnect()
             println("[flight] privileged: ok")
         } else {
-            println("[flight] AZRAEL_AUTH_TOKEN не задан — привилегированная ветка пропущена")
+            println("[flight] AZRAEL_AUTH_TOKEN не задан - привилегированная ветка пропущена")
         }
 
         println("[flight] PASS")

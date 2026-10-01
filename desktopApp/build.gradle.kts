@@ -27,7 +27,7 @@ compose.desktop {
             vendor = "AZRAEL Lab"
             copyright = "Copyright (C) 2026 AZRAEL Lab"
             // Без этих полей jpackage писал в .desktop «Categories=Unknown»,
-            // в control — «Maintainer: AZRAEL Lab <Unknown>», и в меню приложений
+            // в control - «Maintainer: AZRAEL Lab <Unknown>», и в меню приложений
             // AZRAEL-APP попадал в случайную/ни одну секцию.
             linux {
                 appCategory = "Network"

@@ -5,11 +5,11 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-// Версия приложения — из gradle.properties (её же берёт desktopApp).
+// Версия приложения - из gradle.properties (её же берёт desktopApp).
 val azraelVersion: String by project
 
 // Подпись release-APK: keystore и пароли лежат в signing/keystore.properties (никогда не коммитятся).
-// Если файла нет — release собирается unsigned (см. build-all.sh), чтобы CI и форки собирались без секретов.
+// Если файла нет - release собирается unsigned (см. build-all.sh), чтобы CI и форки собирались без секретов.
 val keystoreProps = Properties().apply {
     val f = rootProject.file("signing/keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }

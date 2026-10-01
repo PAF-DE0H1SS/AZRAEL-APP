@@ -41,7 +41,7 @@ actual object Crypto {
      *
      * `KeyPairGenerator.getInstance("Ed25519")` на Android разрешается в
      * AndroidKeyStore, а тот на программную генерацию отвечает
-     * `IllegalStateException: Not initialized` — он умеет только аппаратные ключи.
+     * `IllegalStateException: Not initialized` - он умеет только аппаратные ключи.
      * Нам же нужен обычный ключ JCA: сырые 32 байта приватного ключа лежат в
      * vault установки и участвуют в подписи запросов, hardware-объект туда не
      * положить. Поэтому KeyStore-провайдеры отбрасываются, а генерация идёт

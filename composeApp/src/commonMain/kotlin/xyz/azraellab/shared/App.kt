@@ -13,7 +13,7 @@ import xyz.azraellab.shared.ui.GlassBackground
 fun App(nativeGreeting: () -> String) {
     AppThemeRoot {
         GlassBackground {
-            // Язык с устройства — до первой сети, чтобы входной экран тоже был переведён.
+            // Язык с устройства - до первой сети, чтобы входной экран тоже был переведён.
             LaunchedEffect(Unit) { I18n.load() }
             AppRoot(nativeGreeting)
         }

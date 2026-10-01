@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 /**
  * Сроки автоудаления: guard в [Repos.autodeleteSet] и набор, из которого рисует
- * кнопки ChatsScreen, — это одна и та же величина, иначе чат можно оставить с
+ * кнопки ChatsScreen, - это одна и та же величина, иначе чат можно оставить с
  * сроком, который UI не покажет.
  */
 class AutodeleteDaysTest {
@@ -21,9 +21,9 @@ class AutodeleteDaysTest {
         assertEquals(4, Repos.AUTODELETE_DAYS.size, "null = выключено, плюс три срока")
         assertEquals(3, Repos.AUTODELETE_DAYS.filterNotNull().size, "три непустых срока: 1, 7, 30")
         assertEquals(listOf(null, 30, 90, 365), Repos.PROFILE_AUTODELETE_DAYS)
-        // 30 недели — оба набора. Проверяем, что это единственное совпадение:
+        // 30 недели - оба набора. Проверяем, что это единственное совпадение:
         // лишнее совпадение означало бы, что список профиля случайно повторяет
-        // список чата, а расхождение — что UI предлагает то, что guard отбросит.
+        // список чата, а расхождение - что UI предлагает то, что guard отбросит.
         val chatDays = Repos.AUTODELETE_DAYS.filterNotNull().toSet()
         val profileDays = Repos.PROFILE_AUTODELETE_DAYS.filterNotNull().toSet()
         assertEquals(setOf(30), chatDays.intersect(profileDays))
@@ -81,7 +81,7 @@ class AutodeleteDaysTest {
     @Test
     fun allowedDaysPassTheGuard() = runBlocking {
         // Разрешённый срок guard не отсекает: запрос уходит в сеть и падает там.
-        // Любой отказ означает лишь, что до сети дело дошло, — важно лишь, что
+        // Любой отказ означает лишь, что до сети дело дошло, - важно лишь, что
         // это НЕ «autodelete days not allowed».
         val client = testClient()
         for (good in Repos.AUTODELETE_DAYS) {

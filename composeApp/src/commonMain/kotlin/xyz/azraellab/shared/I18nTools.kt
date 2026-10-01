@@ -8,7 +8,7 @@ package xyz.azraellab.shared
 internal val TOOLS_RU = mapOf(
     "short.title" to "Сократитель",
     "short.none" to "Ссылок нет",
-    "short.none.hint" to "Сократите первую ссылку — она появится здесь",
+    "short.none.hint" to "Сократите первую ссылку - она появится здесь",
     "short.count" to "Ссылок: {0}",
     "short.total" to "Всего: {0}",
     "short.clicks" to "клики: {0}",
@@ -115,7 +115,7 @@ internal val TOOLS_RU = mapOf(
 internal val TOOLS_EN = mapOf(
     "short.title" to "Shortener",
     "short.none" to "No links",
-    "short.none.hint" to "Shorten your first link — it will show up here",
+    "short.none.hint" to "Shorten your first link - it will show up here",
     "short.count" to "Links: {0}",
     "short.total" to "Total: {0}",
     "short.clicks" to "clicks: {0}",

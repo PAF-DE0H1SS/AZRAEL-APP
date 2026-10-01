@@ -11,7 +11,7 @@ import xyz.azraellab.shared.data.model.ShortLinkDto
 
 /**
  * Состояние вкладки сокращателя: список ссылок живёт в [rows] (UiState), все операции
- * с сервером — suspend-функции, возвращающие UiState; UI сам показывает статус.
+ * с сервером - suspend-функции, возвращающие UiState; UI сам показывает статус.
  */
 class ShortenerViewModel(
     private val client: AppClient,

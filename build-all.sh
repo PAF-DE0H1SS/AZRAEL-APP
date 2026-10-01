@@ -30,7 +30,7 @@ find_jdk_with_jpackage() {
 }
 
 if [ -n "${JAVA_HOME:-}" ] && [ ! -x "$JAVA_HOME/bin/jpackage" ] && [[ "$MODE" == "release" ]]; then
-  # Указанный JAVA_HOME не даёт jpackage, а нужен дистрибутив — ищем полный JDK.
+  # Указанный JAVA_HOME не даёт jpackage, а нужен дистрибутив - ищем полный JDK.
   unset JAVA_HOME
 fi
 
@@ -58,7 +58,7 @@ if ! command -v objcopy > /dev/null 2>&1; then
   done
 fi
 
-# .deb (jpackage DEB-бандлер) требует fakeroot и dpkg-deb — на NixOS их тоже нет в PATH.
+# .deb (jpackage DEB-бандлер) требует fakeroot и dpkg-deb - на NixOS их тоже нет в PATH.
 if [ "$MODE" = "linux" ] || [ "$MODE" = "release" ]; then
   if ! command -v fakeroot > /dev/null 2>&1; then
     for d in /nix/store/*fakeroot-*/; do
@@ -114,11 +114,11 @@ fi
 DESKTOP_JAR=$(ls desktopApp/build/compose/jars/*.jar 2>/dev/null | head -1 || true)
 [ -n "$DESKTOP_JAR" ] && cp "$DESKTOP_JAR" "$DIST/AZRAEL-desktop-$(uname -m).jar"
 
-# Linux-форматы: .deb — готовый файл; AppImage в Compose 1.12 — каталог app-image
+# Linux-форматы: .deb - готовый файл; AppImage в Compose 1.12 - каталог app-image
 # (настоящий .AppImage собирает appimagetool в CI, см. .github/workflows/build.yml).
 # Сырой jpackage-пакет публиковать нельзя: в нём нет Depends на реальные
 # библиотеки и нет .desktop/иконки. scripts/finish-deb.sh дополняет его и
-# даёт *_azrael.deb — в dist кладём только его.
+# даёт *_azrael.deb - в dist кладём только его.
 # Именно *_amd64.deb: общий *.deb подхватывает уже дополненный *_azrael.deb,
 # и повторный прогон давал *_azrael_azrael.deb.
 DEB=$(ls desktopApp/build/compose/binaries/main/deb/*_amd64.deb 2>/dev/null | head -1 || true)
@@ -131,7 +131,7 @@ if [ -n "$DEB" ]; then
   fi
 fi
 
-# jpackage/dpkg-deb от root оставляют root-owned файлы — ломают сборку azrael.
+# jpackage/dpkg-deb от root оставляют root-owned файлы - ломают сборку azrael.
 # Владельца не хардкодим: берём того, от кого реально запущен скрипт
 # (`sudo -u …` → SUDO_USER), иначе владельца репозитория, иначе ничего.
 if [ "$(id -u)" = "0" ]; then

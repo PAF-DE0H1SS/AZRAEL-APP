@@ -258,7 +258,7 @@ inline std::vector<uint8_t> from_hex(std::string_view hex) {
 }
 
 // ---------------------------------------------------------------------------
-// PBKDF2-HMAC-SHA256 (RFC 8018) — для шифрования бэкапов и паролей. dkLen в байтах.
+// PBKDF2-HMAC-SHA256 (RFC 8018) - для шифрования бэкапов и паролей. dkLen в байтах.
 // ---------------------------------------------------------------------------
 
 inline bool pbkdf2_sha256(std::string_view password, std::string_view salt,

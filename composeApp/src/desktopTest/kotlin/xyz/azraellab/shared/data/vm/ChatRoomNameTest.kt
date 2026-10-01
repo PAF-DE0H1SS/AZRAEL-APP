@@ -27,7 +27,7 @@ class ChatRoomNameTest {
             ready(chat(2L, "B"))
         }
         assertEquals("B", name)
-        assertEquals(0, loads, "список уже загружен — лишнего запроса быть не должно")
+        assertEquals(0, loads, "список уже загружен - лишнего запроса быть не должно")
     }
 
     @Test
@@ -49,7 +49,7 @@ class ChatRoomNameTest {
             ready()
         }
         assertEquals("Архив", name)
-        assertEquals(0, loads, "имя нашлось в архиве — сеть не трогаем")
+        assertEquals(0, loads, "имя нашлось в архиве - сеть не трогаем")
     }
 
     @Test
@@ -60,7 +60,7 @@ class ChatRoomNameTest {
             ready(chat(1L, "A"))
         }
         assertEquals("", name)
-        assertEquals(0, loads, "список готов, чата в нём нет — повторный запрос бессмыслен")
+        assertEquals(0, loads, "список готов, чата в нём нет - повторный запрос бессмыслен")
     }
 
     @Test
@@ -81,8 +81,8 @@ class ChatRoomNameTest {
             loads++
             ready(chat(2L, "B"))
         }
-        assertEquals("", name, "пробельное имя из готового списка — не имя")
-        assertEquals(0, loads, "список готов — повторный запрос не нужен, UI покажет заголовок по умолчанию")
+        assertEquals("", name, "пробельное имя из готового списка - не имя")
+        assertEquals(0, loads, "список готов - повторный запрос не нужен, UI покажет заголовок по умолчанию")
     }
 
     @Test
@@ -99,6 +99,6 @@ class ChatRoomNameTest {
     @Test
     fun chatRemovedEverywhereYieldsEmptyName() = runBlocking {
         val name = chatRoomName(5L, UiState.Loading, UiState.Ready(emptyList())) { ready() }
-        assertEquals("", name, "нет данных — пустая строка, UI рисует нейтральный заголовок")
+        assertEquals("", name, "нет данных - пустая строка, UI рисует нейтральный заголовок")
     }
 }

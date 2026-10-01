@@ -17,7 +17,7 @@ import xyz.azraellab.shared.AppDeepLink
 // в Compose 1.12.1 у `ApplicationScope` есть только `exitApplication()`.
 fun main(args: Array<String>) {
     // Deep link из командной строки: `azrael-app azrael://messages/42`.
-    // Ссылка кладётся в очередь до старта композиции — её заберёт `MainShell`
+    // Ссылка кладётся в очередь до старта композиции - её заберёт `MainShell`
     // после того, как придёт `tabConfig` и станут понятны права.
     AppDeepLink.offer(args.firstOrNull { it.startsWith("azrael://") })
     application {

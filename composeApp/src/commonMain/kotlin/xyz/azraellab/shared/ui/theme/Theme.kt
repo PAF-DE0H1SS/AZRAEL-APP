@@ -20,7 +20,7 @@ enum class AppThemeMode(val code: String) {
     }
 }
 
-/** Разрешение режима в «тёмное/светлое» без доступа к системе — тестируемо и не @Composable. */
+/** Разрешение режима в «тёмное/светлое» без доступа к системе - тестируемо и не @Composable. */
 fun resolveDark(mode: AppThemeMode, systemDark: Boolean): Boolean = when (mode) {
     AppThemeMode.LIGHT -> false
     AppThemeMode.DARK -> true
@@ -34,7 +34,7 @@ object AzraelThemeState {
     /**
      * Последнее прочитанное системное значение темы. `isSystemInDarkTheme()` доступна
      * только в композиции, поэтому результат кладём сюда: обработчики кнопок (в том
-     * числе [toggle]) — обычные функции и не могут звать composable.
+     * числе [toggle]) - обычные функции и не могут звать composable.
      */
     private var systemDark: Boolean by mutableStateOf(false)
 
