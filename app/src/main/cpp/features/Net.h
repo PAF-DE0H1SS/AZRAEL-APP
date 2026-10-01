@@ -8,7 +8,7 @@ namespace az {
 namespace net {
 
 // Простой блокирующий TCP-сокет (POSIX, C++17).
-// Для HTTPS поверх используйте OpenSSL/вызов JVM (OkHttp) — тут чистый TCP,
+// Для HTTPS поверх используйте OpenSSL/вызов JVM (OkHttp) - тут чистый TCP,
 // чтобы не тянуть тяжёлые зависимости в NDK-сборку.
 
 class TcpSocket {
@@ -27,7 +27,7 @@ public:
     bool valid() const { return fd_ >= 0; }
 
     // Подключение к host:port (getaddrinfo, IPv4/IPv6, первый успешный адрес).
-    // timeout_ms: <=0 — блокирово; >0 — лимит на connect().
+    // timeout_ms: <=0 - блокирово; >0 - лимит на connect().
     bool connect(const std::string& host, uint16_t port, int timeout_ms = 0);
 
     void close();

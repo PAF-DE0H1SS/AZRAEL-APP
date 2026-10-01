@@ -9,7 +9,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Навигация — единственное место, где ошибка выглядит как «приложение сломалось»:
+ * Навигация - единственное место, где ошибка выглядит как «приложение сломалось»:
  * back-stack теряется при повороте экрана, а незнакомый `tabConfig` роняет UI.
  * Поэтому проверяем логику стека и разбора ссылок, а не картинку.
  */
@@ -40,7 +40,7 @@ class NavTest {
 
     @Test
     fun deepLinkArgOpensSettingsSubScreen() {
-        // Раздел без аргумента — сам раздел, с аргументом — конкретный подэкран.
+        // Раздел без аргумента - сам раздел, с аргументом - конкретный подэкран.
         assertEquals(
             Destination.Detail(DetailKind.Setting, "devices"),
             parseDestination("settings/devices")
@@ -71,7 +71,7 @@ class NavTest {
 
     @Test
     fun bothVpnIdsMapToSameTab() {
-        // `vpn_tab` и `vpn` — исторически два id одного раздела.
+        // `vpn_tab` и `vpn` - исторически два id одного раздела.
         assertEquals(Destination.Tab(TabSpec.Vpn), parseDestination("vpn_tab"))
         assertEquals(Destination.Tab(TabSpec.Vpn), parseDestination("vpn"))
     }
@@ -82,13 +82,13 @@ class NavTest {
     fun everyServerTabIsKeptEvenIfUnknownToClient() {
         val cfg = config("messages", "billing_v2")
         assertEquals(listOf("messages", "billing_v2"), cfg.items.map { it.id })
-        // Неизвестный раздел виден и выбрать его можно — иначе он молча пропадёт.
+        // Неизвестный раздел виден и выбрать его можно - иначе он молча пропадёт.
         assertNotNull(cfg.destinationOf("billing_v2"))
     }
 
     @Test
     fun defaultTabFallsBackWhenNotGranted() {
-        // Сервер может прислать `defaultTab` admin'а, а роль — обычная: показываем
+        // Сервер может прислать `defaultTab` admin'а, а роль - обычная: показываем
         // первый доступный раздел, а не пустой экран.
         val cfg = config("messages", "settings", defaultTab = "admin")
         assertEquals("messages", cfg.rootId)
@@ -136,13 +136,13 @@ class NavTest {
 
     @Test
     fun placeholderSurvivesDecodeButIsEvictedByRebase() {
-        // `x:` — это настоящий пункт (сервер прислал раздел, которого нет в клиенте),
+        // `x:` - это настоящий пункт (сервер прислал раздел, которого нет в клиенте),
         // поэтому он переживает пересоздание Activity. А «раздел сняли на сервере»
         // закрывает уже `rebase`, у которого есть `tabConfig`.
         val restored = NavState.decode("t:messages|x:billing_v2")
         assertNotNull(restored)
         assertEquals(Destination.Placeholder("billing_v2"), restored.current)
-        // `x:` без id — мусор, такой пункт не восстанавливаем.
+        // `x:` без id - мусор, такой пункт не восстанавливаем.
         assertNull(NavState.decode("x:"))
     }
 
@@ -214,14 +214,14 @@ class NavTest {
         val navigator = Navigator(NavState.of(cfg.root))
         assertTrue(navigator.open(cfg, DetailKind.ChatRoom, "9"))
         assertEquals(Destination.Detail(DetailKind.ChatRoom, "9"), navigator.destination)
-        // Без id чата открывать нечего — тихий no-op, а не битый экран.
+        // Без id чата открывать нечего - тихий no-op, а не битый экран.
         assertFalse(navigator.open(cfg, DetailKind.ChatRoom))
         assertEquals(Destination.Detail(DetailKind.ChatRoom, "9"), navigator.destination)
     }
 
     @Test
     fun navigatorRejectsDetailOfTabClosedForRole() {
-        // Роли без «Настроек»: экран настройки — подэкран Settings, а не Messages,
+        // Роли без «Настроек»: экран настройки - подэкран Settings, а не Messages,
         // поэтому раньше `open(Setting)` пускал туда вообще всех.
         val cfg = config("messages")
         val navigator = Navigator(NavState.of(cfg.root))
@@ -236,7 +236,7 @@ class NavTest {
         val navigator = Navigator(NavState.of(cfg.root))
         assertTrue(navigator.openDeepLink(cfg, "messages/42"))
         assertEquals(Destination.Detail(DetailKind.ChatRoom, "42"), navigator.destination)
-        // Админки в tabConfig нет — внешняя ссылка не должна её открывать.
+        // Админки в tabConfig нет - внешняя ссылка не должна её открывать.
         assertFalse(navigator.openDeepLink(cfg, "admin"))
         assertFalse(navigator.openDeepLink(cfg, "admin/users"))
         assertEquals(Destination.Detail(DetailKind.ChatRoom, "42"), navigator.destination)
@@ -256,7 +256,7 @@ class NavTest {
         assertFalse(navigator.openDeepLink(cfg, ""))
         assertFalse(navigator.openDeepLink(cfg, "/"))
         assertFalse(navigator.openDeepLink(cfg, "messages/42/extra"))
-        // Неизвестный id — не маршрут: заглушка показывается для вкладки из
+        // Неизвестный id - не маршрут: заглушка показывается для вкладки из
         // `tabConfig`, но внешняя ссылка в неё не ведёт.
         assertFalse(navigator.openDeepLink(cfg, "new_section"))
         assertEquals(1, navigator.depth)
@@ -308,7 +308,7 @@ class NavTest {
 
     @Test
     fun tabHiddenByServerIsNotInNavBar() {
-        // `visible: false` — это «закрыт по роли», а не «неизвестен»: раздел обязан
+        // `visible: false` - это «закрыт по роли», а не «неизвестен»: раздел обязан
         // исчезнуть из панели, но его нельзя терять в разборе (иначе неизвестный
         // раздел и закрытый по роли выглядели бы одинаково).
         val cfg = buildTabConfig(
@@ -320,7 +320,7 @@ class NavTest {
             defaultTab = "admin"
         )
         assertEquals(listOf("messages", "settings"), cfg.items.map { it.id })
-        // `defaultTab` на закрытый раздел игнорируется — иначе корень был бы невидим.
+        // `defaultTab` на закрытый раздел игнорируется - иначе корень был бы невидим.
         assertEquals("messages", cfg.rootId)
         assertNull(cfg.destinationOf("admin"))
     }
@@ -351,11 +351,11 @@ class NavTest {
     @Test
     fun brokenScrollOffsetsAreDroppedWithoutLosingTheRest() {
         // Мусор в одной записи не должен обнулять весь список: сохраняется то,
-        // что распарсилось, остальное — как будто позиции не было.
+        // что распарсилось, остальное - как будто позиции не было.
         val decoded = ScrollPositions.decode("settings=42,broken,admin=x,shortener=7")
         assertEquals(42, decoded["settings"])
         assertEquals(7, decoded["shortener"])
-        // `admin=x` не число — запись отброшена целиком, читается как «позиции нет».
+        // `admin=x` не число - запись отброшена целиком, читается как «позиции нет».
         assertNull(decoded["admin"])
         assertNull(decoded["broken"])
         assertEquals(0, ScrollPositions(decoded)["admin"])
@@ -375,7 +375,7 @@ class NavTest {
     @Test
     fun everyChatKeepsItsOwnScrollPosition() {
         // Комната приходит как `Detail(ChatRoom, id)`, поэтому список диалогов и
-        // каждый отдельный чат — разные экраны с разными позициями. Общий ключ
+        // каждый отдельный чат - разные экраны с разными позициями. Общий ключ
         // (как было, пока комната жила в списке) означал бы, что открытый диалог
         // всегда показывается с начала, а у второго чата позиция первого.
         assertEquals(roomScrollKey(42), roomScrollKey(42))
@@ -395,7 +395,7 @@ class NavTest {
     @Test
     fun switchingRoomsUnwindsToPreviousRoomThenToList() {
         // Широкий экран держит список слева, поэтому «назад» из комнаты обязан
-        // вернуть предыдущий открытый диалог, а только потом — список. Раньше
+        // вернуть предыдущий открытый диалог, а только потом - список. Раньше
         // открытый чат был локальным состоянием, и «назад» его просто закрывал.
         val cfg = config("messages")
         val navigator = Navigator(NavState.of(cfg.root))
@@ -436,7 +436,7 @@ class NavTest {
 
     @Test
     fun roomArgMustBeNumberToShowTheRoom() {
-        // Экран рисует комнату только когда `arg` — id чата; мусорный аргумент
+        // Экран рисует комнату только когда `arg` - id чата; мусорный аргумент
         // (`azrael://messages/abc`) оставляет список, а не пустой диалог.
         val room = parseDestination("messages/abc")
         assertEquals(Destination.Detail(DetailKind.ChatRoom, "abc"), room)

@@ -26,7 +26,7 @@ import xyz.azraellab.shared.ui.components.AzraelChoiceChip
 import xyz.azraellab.shared.ui.components.AzraelTextField
 import xyz.azraellab.shared.ui.theme.AzraelSpace
 
-/** Список строк настроек — рисует каждую [ConfigSpec] по её типу. */
+/** Список строк настроек - рисует каждую [ConfigSpec] по её типу. */
 @Composable
 fun ConfigurableList(
     specs: List<ConfigSpec>,

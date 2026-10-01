@@ -56,7 +56,7 @@ object AppApi {
     const val PROFILE_SEARCH_USERS = "profile.searchUsers"
 
     /**
-     * Язык аккаунта (users.lang) — общий для сайта и всех устройств.
+     * Язык аккаунта (users.lang) - общий для сайта и всех устройств.
      * Намеренно НЕ входит в L2_OPS: на сервере операция тоже вне L2-слоя.
      */
     const val PROFILE_SET_LANG = "profile.setLang"
@@ -140,7 +140,7 @@ object AppApi {
 
     /**
      * Операции без device-подписи: ключа установки ещё нет либо подпись не нужна.
-     * Вход/регистрация идут без подписи всегда — иначе вход на новую установку
+     * Вход/регистрация идут без подписи всегда - иначе вход на новую установку
      * был бы невозможен, а на уже привязанной подпись сделала бы аккаунт
      * неразличимым между «кем вошли» и «кем привязана установка».
      */
@@ -165,7 +165,7 @@ object AppErrorCode {
     const val VALIDATION = 204
     const val FROZEN = 109
     // Слои L2. Сервер для тех же ситуаций отдаёт 108 ('l2 envelope required',
-    // 'l2 eph required') и 107 ('l2 unavailable', 'l2 gateway error') — те же
+    // 'l2 eph required') и 107 ('l2 unavailable', 'l2 gateway error') - те же
     // коды, что у него означают обычный Forbidden и внутреннюю ошибку, поэтому
     // клиентские коды берутся из свободного диапазона 120+ и приводятся к ним
     // в l2AwareErrorCode: иначе «L2 на устройстве недоступен» не отличить от
@@ -178,7 +178,7 @@ object AppErrorCode {
 }
 
 /**
- * L2 в сообщении сервера — отдельным словом, а не хвостом другого идентификатора.
+ * L2 в сообщении сервера - отдельным словом, а не хвостом другого идентификатора.
  * `\b` отсекает «mysql2», но не «l2-слой» и не «app-l2»: последний сервер не
  * присылает (это путь импорта в нашем же коде), так что ловить его не нужно.
  */
@@ -187,11 +187,11 @@ private val L2_MESSAGE_RE = Regex("\\bl2\\b", RegexOption.IGNORE_CASE)
 /**
  * Переводит серверный код ошибки в клиентский там, где сервер говорит именно про L2.
  *
- * Отличать L2-ошибки приходится по тексту: 108 у сервера — это ещё и обычный
- * Forbidden (например, гостевой `chatSend`), а 107 — обычная внутренняя ошибка,
+ * Отличать L2-ошибки приходится по тексту: 108 у сервера - это ещё и обычный
+ * Forbidden (например, гостевой `chatSend`), а 107 - обычная внутренняя ошибка,
  * так что remap по одному коду сломал бы обе. Правило узкое: код 107/108 и
  * серверское сообщение с отдельным словом `l2`. Тогда `chats.archive` гостю по-прежнему
- * показывает «Доступ запрещён», а обрыв L2 — «L2 недоступен» с подсказкой.
+ * показывает «Доступ запрещён», а обрыв L2 - «L2 недоступен» с подсказкой.
  */
 internal fun l2AwareErrorCode(code: Int, message: String?): Int {
     if (!L2_MESSAGE_RE.containsMatchIn(message.orEmpty())) return code
@@ -227,7 +227,7 @@ data class AppRequest(
  *  1. Внешний конверт (AppSecure): AES-256-GCM ключом канала + HMAC-подпись + anti-replay.
  *  2. L2 (трёхсторонний) конверт для чувствительных операций: эфемерный X25519 +
  *     HKDF-SHA256 к статическому ключу сервера; сайт переносит конверт вслепую.
- *  3. Device-подпись (Ed25519) поверх сырого тела запроса — привязка установки
+ *  3. Device-подпись (Ed25519) поверх сырого тела запроса - привязка установки
  *     к аккаунту и отзыв устройства через /admin.
  *  4. Синхронизация часов по x-azrael-srv-ts (с retry при рассинхроне ts).
  */
@@ -292,7 +292,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
      * а привязка к аккаунту при этом ещё не создана, и регистрация обязана быть
      * разрешена. В vault хранится полем `bound`; если поля нет (vault, созданный до
      * появления per-install ключей), привязка считается состоявшейся вместе с
-     * ключами — раньше они появлялись только при привязке.
+     * ключами - раньше они появлялись только при привязке.
      */
     private var deviceBound: Boolean = false
 
@@ -330,7 +330,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
      * БРОСАЮТ `IllegalArgumentException`, и тогда вместо `AppException` с
      * внятным кодом наружу улетает необработанное исключение из API-слоя.
      * Мягкое приведение (`as?`) превращает «поле не того типа» в «поля нет».
-     * `JsonNull` — подтип `JsonPrimitive`, его отсекает `contentOrNull`.
+     * `JsonNull` - подтип `JsonPrimitive`, его отсекает `contentOrNull`.
      */
     private fun JsonObject.raw(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 
@@ -364,7 +364,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
 
     fun sessionToken(): String? = token
 
-    /** Логин сохранённой учётной записи (пусто — ничего не сохранено). */
+    /** Логин сохранённой учётной записи (пусто - ничего не сохранено). */
     fun rememberedLogin(): String = savedLogin ?: ""
 
     /** Есть ли сохранённые учётные данные для автозаполнения формы входа. */
@@ -414,7 +414,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
     /**
      * device.bind без записи состояния: вызывающий сам решает, принять ли привязку.
      *
-     * [expectedUsername] — логин, под которым открывается форма входа. Сервер
+     * [expectedUsername] - логин, под которым открывается форма входа. Сервер
      * сверяет его с владельцем ключа ДО записи, поэтому ключ чужого аккаунта
      * не создаёт привязку и не включает анти-угон (заморозку обоих аккаунтов).
      */
@@ -463,7 +463,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
      * Регистрация нового аккаунта и привязка установки в один шаг.
      *
      * Сервер сам выдаёт новому аккаунту индивидуальный ключ привязки
-     * (provisionKey) — пользователь его не вводит и не видит, программа
+     * (provisionKey) - пользователь его не вводит и не видит, программа
      * привязывается сразу. Возвращает {username, role, lang, uid, new_user}.
      */
     fun authRegister(
@@ -573,7 +573,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         return data
     }
 
-    /** devId = sha256hex("AZRAEL-DEV|<localDeviceId>|<pubB64>") — зеркало lib/app-device.ts. */
+    /** devId = sha256hex("AZRAEL-DEV|<localDeviceId>|<pubB64>") - зеркало lib/app-device.ts. */
     private fun devIdFrom(localDeviceId: String, pubB64: String): String =
         AppInstall.devIdFrom(localDeviceId, pubB64)
 
@@ -583,7 +583,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         val tsStr = ts.toString()
         val msg = "AZRAEL-DEV|$tsStr|$nonce|${Hex.toHex(Crypto.sha256(body.toByteArray(Charsets.UTF_8)))}"
         // Публичный ключ установки уже лежит в [DeviceKeys], а он зависит только
-        // от seed — передаём его, чтобы не платить за лишнее умножение на базовую
+        // от seed - передаём его, чтобы не платить за лишнее умножение на базовую
         // точку на каждом запросе.
         val sig = Crypto.ed25519Sign(kp.priv, msg.toByteArray(Charsets.UTF_8), kp.pub)
         return mapOf(
@@ -646,10 +646,10 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
             ?: throw AppException(AppErrorCode.MALFORMED, "l2 malformed response")
         val err = inner.raw("err")?.toIntOrNull() ?: AppErrorCode.MALFORMED
         if (err != AppErrorCode.OK) {
-            // Внутри запечатанного конверта — обычный err обработчика (гостевой
+            // Внутри запечатанного конверта - обычный err обработчика (гостевой
             // Forbidden и т.п.), а не транспортная ошибка L2: внешний роут заменяет
             // любую plaintext-ошибку внутреннего роута на 107 'l2 gateway error'
-            // ещё до запечатывания. l2AwareErrorCode здесь — страховка на случай,
+            // ещё до запечатывания. l2AwareErrorCode здесь - страховка на случай,
             // если сервер начнёт класть такие тексты внутрь конверта; на бизнес-ошибках
             // (в т.ч. «Forbidden») она не срабатывает.
             val innerMsg = inner.raw("error") ?: "err=$err"
@@ -660,7 +660,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
 
     /**
      * Базовый запрос: возвращает data-объект, бросает AppException при err или нарушении подписи.
-     * [timeoutMs] — сетевой таймаут (LLM-операциям нужен больший), [allowProtected] —
+     * [timeoutMs] - сетевой таймаут (LLM-операциям нужен больший), [allowProtected] -
      * единственный пропуск tombstone-проверки: так снимается блокировка по подписанной метке release.
      */
     fun call(
@@ -676,7 +676,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         try {
             return callOnce(op, args, session, timeoutMs)
         } catch (e: AppException) {
-            // Рассинхрон часов: сервер вернул 102, а x-azrael-srv-ts уже обновил offset — повтор.
+            // Рассинхрон часов: сервер вернул 102, а x-azrael-srv-ts уже обновил offset - повтор.
             if (e.code == AppErrorCode.TS_SKEW) return callOnce(op, args, session, timeoutMs)
             throw e
         }
@@ -688,7 +688,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         val nonce = Base64Codec.encode(randomBytes(AppSecure.NONCE_SIZE))
         // Fail-closed для L2. Сервер проверяет заголовок x-azrael-l2, а не сам факт
         // попадания op в L2_OPS: если клиент не приложил конверт, запрос просто
-        // обрабатывается открытым — без ошибки. Значит «ключа L2 нет» нельзя
+        // обрабатывается открытым - без ошибки. Значит «ключа L2 нет» нельзя
         // выражать как useL2=false: тогда чаты, файлы, инвайты, OTP-секрет и
         // profile.update ушли бы сайту в открытом виде. Синхронизировано с
         // app/api/app/v1/route.ts (L2_OPS) и Http.*.kt (ключ по умолчанию).
@@ -710,7 +710,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
                 put(AppSecure.HDR_NONCE, sealed.nonce)
                 put(AppSecure.HDR_SIG, sealed.sig)
                 put(AppSecure.HDR_KG, gen.toString())
-                // Ключ канала выдан этой установке — сервер пересчитывает per-install
+                // Ключ канала выдан этой установке - сервер пересчитывает per-install
                 // ключ по devId и подписывает ответ тем же ключом.
                 device?.devId?.let { put(AppSecure.HDR_KID, it) }
                 if (l2 != null) {
@@ -727,7 +727,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
                 throw AppException(AppErrorCode.FORBIDDEN, "bad server signature")
             }
             // Канал может быть «отравлен» (скомпрометированный ключ/отзыв устройства): конверт
-            // валиден, но содержимое — белеберда. Настоящий клиент уходит в защиту: пишет
+            // валиден, но содержимое - белеберда. Настоящий клиент уходит в защиту: пишет
             // «могилу» и блокируется, чтобы не «вылечиться» переустановкой.
             if (AppSecure.isResponsePoisoned(resp)) {
                 AppTrap.installProtection()
@@ -746,7 +746,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
             }
         } else {
             // Fail-closed: без ключа установки запрос не уходит. Раньше здесь был
-            // plaintext-вызов без подписи и без проверки ответа — при любой потере
+            // plaintext-вызов без подписи и без проверки ответа - при любой потере
             // ключа (удалённый app-key, битый vault) клиент молча слал данные
             // открытым текстом и принимал неподписанный ответ. Ключ выдаёт
             // bootstrap до создания клиента, поэтому сюда мы попадать не должны.
@@ -769,7 +769,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
 
     /**
      * Единственная операция, доступная при tombstone-защите: подписанный ответ сервера
-     * может нести метку release — тогда AppTrap.removeProtection() снимает блокировку.
+     * может нести метку release - тогда AppTrap.removeProtection() снимает блокировку.
      * Вернёт true, если защита снята этим вызовом.
      */
     fun probeRelease(): Boolean {
@@ -809,7 +809,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
             put("oldPassword", oldPassword); put("newPassword", newPassword)
         })
 
-    /** Отозвать сессию: чужой токен или текущий (null — разорвать собственный доступ). */
+    /** Отозвать сессию: чужой токен или текущий (null - разорвать собственный доступ). */
     fun revokeSession(otherToken: String? = null): JsonObject =
         call(AppApi.SESSION_REVOKE, buildJsonObject { otherToken?.let { put("token", it) } })
 
@@ -836,8 +836,8 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
     fun profilePrivacyGet(): JsonObject = call(AppApi.PROFILE_PRIVACY_GET)
 
     /**
-     * Настройки приватности. Значения уходят НАСТОЯЩИМИ JSON-типами: булево — как boolean
-     * (строка "0" на сервере истинна), остальное — строкой.
+     * Настройки приватности. Значения уходят НАСТОЯЩИМИ JSON-типами: булево - как boolean
+     * (строка "0" на сервере истинна), остальное - строкой.
      */
     fun profilePrivacySet(values: Map<String, Any>): JsonObject =
         call(
@@ -851,7 +851,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
 
     /**
      * Сменить язык аккаунта. Сервер принимает только ru/en/zh и отвечает
-     * {ok:true, lang:"<код>"} — тем же кодом, который придёт в home.boot.lang.
+     * {ok:true, lang:"<код>"} - тем же кодом, который придёт в home.boot.lang.
      * Значение приходит и на сайт, и в другие устройства.
      */
     fun profileSetLang(lang: String): JsonObject =
@@ -902,7 +902,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
     fun chatsAutodeleteGet(chatId: Long? = null): JsonObject =
         call(AppApi.CHATS_AUTODELETE_GET, buildJsonObject { chatId?.let { put("chatId", it) } })
 
-    /** Таймер удаления сообщений в чате: days = null — выключить. */
+    /** Таймер удаления сообщений в чате: days = null - выключить. */
     fun chatsAutodeleteSet(chatId: Long?, days: Int?): JsonObject =
         call(AppApi.CHATS_AUTODELETE_SET, buildJsonObject {
             chatId?.let { put("chatId", it) }
@@ -969,7 +969,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         )
 
     // --- admin (только для аккаунта с ролью admin/owner) ---
-    /** {frozen:[{id,username,frozen_at}], devices:[…]} — замороженные аккаунты и установки. */
+    /** {frozen:[{id,username,frozen_at}], devices:[…]} - замороженные аккаунты и установки. */
     fun adminFreezeList(): JsonObject = call(AppApi.ADMIN_FREEZE_LIST)
 
     /** Разморозить аккаунт по логину и вернуть его установки в активные. */
@@ -982,7 +982,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         call(AppApi.OTP_VALIDATE, buildJsonObject { put("code", code) })
 
     private companion object {
-        /** HKDF-Extract соль L2-слоя — зеркало HKDF_SALT в серверном lib/app-l2.ts. */
+        /** HKDF-Extract соль L2-слоя - зеркало HKDF_SALT в серверном lib/app-l2.ts. */
         val L2_SALT = "AZRAEL-APP|L2|v1|salt".toByteArray(Charsets.UTF_8)
 
         const val DEFAULT_TIMEOUT_MS = 20_000

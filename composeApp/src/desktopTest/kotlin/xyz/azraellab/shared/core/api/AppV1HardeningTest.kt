@@ -29,11 +29,11 @@ import kotlin.test.assertTrue
  * Три группы:
  *  1. L2 обязан быть fail-closed. Сервер определяет L2 не по таблице операций,
  *     а по заголовку `x-azrael-l2: 1` (app/api/app/v1/route.ts, `wantL2`).
- *     Клиент без конверта НЕ получает ошибку — запрос молча обрабатывается
+ *     Клиент без конверта НЕ получает ошибку - запрос молча обрабатывается
  *     открытым. Значит «ключа L2 нет» нельзя выражать как `useL2 = false`.
  *  2. Коды ошибок клиента не должны совпадать с серверными 107/108, иначе
  *     `errText` покажет чужой текст на «нет ключа на устройстве».
- *  3. Ответ сервера — словарь; любой ключ может оказаться объектом/массивом.
+ *  3. Ответ сервера - словарь; любой ключ может оказаться объектом/массивом.
  *     Разбор обязан давать «поля нет», а не исключение.
  */
 class AppV1HardeningTest {
@@ -42,7 +42,7 @@ class AppV1HardeningTest {
     private var originalSrvXPub: String? = null
     private val homes: MutableList<Path> = mutableListOf()
 
-    // Порт 1 — заведомо неслушаемый: если запрос всё-таки уйдёт в сеть,
+    // Порт 1 - заведомо неслушаемый: если запрос всё-таки уйдёт в сеть,
     // ошибка будет NETWORK, а не L2_UNAVAILABLE. Так тест отличает «сработал
     // guard до отправки» от «упала сеть».
     private val deadUrl = "http://127.0.0.1:1/api/app/v1"
@@ -88,7 +88,7 @@ class AppV1HardeningTest {
         AppRuntime.srvXPubB64 = null
         val b64 = defaultAppSrvPubB64()
         assertTrue(b64 != null, "desktop обязан иметь встроенный X25519-ключ сервера")
-        assertEquals(32, Base64Codec.decode(b64!!).size, "ключ L2 — это raw-32 публичного ключа")
+        assertEquals(32, Base64Codec.decode(b64!!).size, "ключ L2 - это raw-32 публичного ключа")
     }
 
     @Test
@@ -104,7 +104,7 @@ class AppV1HardeningTest {
         AppRuntime.srvXPubB64 = "не-base64-мусор"
         assertFalse(AppClient(deadUrl, ByteArray(32) { 7 }).isL2Available)
 
-        // Короткий (не 32 байта) ключ — тоже не ключ.
+        // Короткий (не 32 байта) ключ - тоже не ключ.
         AppRuntime.srvXPubB64 = Base64Codec.encode(ByteArray(16) { 1 })
         assertFalse(AppClient(deadUrl, ByteArray(32) { 7 }).isL2Available)
     }
@@ -133,7 +133,7 @@ class AppV1HardeningTest {
 
     @Test
     fun everyL2OperationIsGuarded() {
-        // Список L2_OPS — зеркало серверного. Если в него попадёт операция,
+        // Список L2_OPS - зеркало серверного. Если в него попадёт операция,
         // для неё обязана сработать та же защита.
         AppRuntime.srvXPubB64 = "не-base64-мусор"
         val client = AppClient(deadUrl, ByteArray(32) { 7 })
@@ -150,7 +150,7 @@ class AppV1HardeningTest {
     @Test
     fun l2ClientCodesDoNotCollideWithServerCodes() {
         // Сервер: 107 = 'l2 unavailable', 108 = 'l2 envelope required'.
-        // INTERNAL/FORBIDDEN — общие протокольные коды, они и равны 107/108;
+        // INTERNAL/FORBIDDEN - общие протокольные коды, они и равны 107/108;
         // ловить надо коллизию именно L2-кодов с ними, иначе errText для
         // «нет ключа L2 на устройстве» покажет текст серверной ошибки.
         assertEquals(107, AppErrorCode.INTERNAL)
@@ -168,7 +168,7 @@ class AppV1HardeningTest {
 
     @Test
     fun l2ServerErrorsBecomeClientL2Codes() {
-        // Внешний роут (server_appv1.ts, ветка wantL2) — ровно эти пары код/текст
+        // Внешний роут (server_appv1.ts, ветка wantL2) - ровно эти пары код/текст
         // доходят до клиента.
         for (msg in listOf("l2 envelope required", "l2 eph required")) {
             assertEquals(AppErrorCode.L2_REQUIRED, l2AwareErrorCode(108, msg), msg)
@@ -198,9 +198,9 @@ class AppV1HardeningTest {
 
     @Test
     fun nonL2ForbiddenAndInternalErrorsKeepServerCodes() {
-        // 108 — общий «Forbidden» (например, гостевой chats.archive), 107 — общая
+        // 108 - общий «Forbidden» (например, гостевой chats.archive), 107 - общая
         // внутренняя ошибка. Если бы remap шёл по коду, гостю показали бы «L2
-        // недоступен» вместо «доступ запрещён». Плюс слова, где l2 — часть слова.
+        // недоступен» вместо «доступ запрещён». Плюс слова, где l2 - часть слова.
         for (msg in listOf("Forbidden", "Пользователь ограничил общение")) {
             assertEquals(108, l2AwareErrorCode(108, msg), msg)
         }
@@ -210,7 +210,7 @@ class AppV1HardeningTest {
         )) {
             assertEquals(107, l2AwareErrorCode(107, msg), msg)
         }
-        // l2 внутри слова («mysql2») — не про L2-слой.
+        // l2 внутри слова («mysql2») - не про L2-слой.
         assertEquals(107, l2AwareErrorCode(107, "mysql2 unavailable"))
         for (code in listOf(104, 109, 201, 204)) {
             assertEquals(code, l2AwareErrorCode(code, "l2 envelope required"), "код $code не должен переписываться")
@@ -228,9 +228,9 @@ class AppV1HardeningTest {
             put("obj", buildJsonObject { put("a", 1) })
             put("arr", buildJsonArray { })
         }
-        assertNull(o.s("obj"), "вложенный объект — это «поля нет», а не исключение")
-        assertNull(o.s("arr"), "массив — это «поля нет», а не исключение")
-        assertNull(o.s("nul"), "JsonNull — это «поля нет»")
+        assertNull(o.s("obj"), "вложенный объект - это «поля нет», а не исключение")
+        assertNull(o.s("arr"), "массив - это «поля нет», а не исключение")
+        assertNull(o.s("nul"), "JsonNull - это «поля нет»")
         assertNull(o.s("missing"))
         assertNull(o.i("obj"))
         assertNull(o.l("arr"))
@@ -241,12 +241,12 @@ class AppV1HardeningTest {
     @Test
     fun deviceStatusUnboundIsNotMistakenForStatus() {
         // Сервер для непривязанной установки: `{ bound: false, devId: null }`.
-        // Поля `status` там нет вовсе — раньше UI показывал «?» вместо «не привязано».
+        // Поля `status` там нет вовсе - раньше UI показывал «?» вместо «не привязано».
         val d = DeviceDto.from(buildJsonObject {
             put("bound", false)
             put("devId", kotlinx.serialization.json.JsonNull)
         })
-        assertFalse(d.bound, "нет ни bound=true, ни status — установка не привязана")
+        assertFalse(d.bound, "нет ни bound=true, ни status - установка не привязана")
         assertNull(d.status)
         assertEquals("", d.devId)
     }
@@ -260,7 +260,7 @@ class AppV1HardeningTest {
         assertTrue(bound.bound)
         assertEquals("active", bound.status)
 
-        // Старая форма (без поля bound) — привязка выводится из наличия status,
+        // Старая форма (без поля bound) - привязка выводится из наличия status,
         // иначе существующие установки выглядели бы непривязанными.
         val legacy = DeviceDto.from(buildJsonObject { put("status", "active") })
         assertTrue(legacy.bound, "legacy-ответ без bound обязан остаться привязанным")

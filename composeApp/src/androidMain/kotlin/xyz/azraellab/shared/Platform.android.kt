@@ -45,7 +45,7 @@ actual fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit) {
 private var storageDir: File? = null
 
 /**
- * Каталог данных установки: `filesDir/azraellab` — вне зоны досягаемости
+ * Каталог данных установки: `filesDir/azraellab` - вне зоны досягаемости
  * «очистки кэша» и исключён из бэкапа (см. backup_rules.xml).
  */
 actual fun initStorageDir(dir: String) {
@@ -57,14 +57,14 @@ actual fun logAzraelError(tag: String, message: String, error: Throwable?) {
 }
 
 /**
- * Сеть на Android — событийная: `registerDefaultNetworkCallback` сам сообщает о
+ * Сеть на Android - событийная: `registerDefaultNetworkCallback` сам сообщает о
  * появлении и пропадании сети, опрос не нужен.
  *
  * Проверяется `NET_CAPABILITY_INTERNET` + `NET_CAPABILITY_VALIDATED`, а не просто
  * «есть активная сеть»: Wi-Fi с captive-порталом (аэропорт, гостиница) даёт
  * активный интерфейс без валидации, и по такому признаку баннер «нет сети» не
  * показывался бы именно тогда, когда он нужен. Право `ACCESS_NETWORK_STATE`
- * добавлено в манифест — без него `activeNetwork` всегда null.
+ * добавлено в манифест - без него `activeNetwork` всегда null.
  */
 @Composable
 actual fun rememberOnline(): Boolean {
@@ -85,7 +85,7 @@ actual fun rememberOnline(): Boolean {
                 online = context.isValidatedOnline()
             }
         }
-        // Регистрация может упасть (например, если сервис недоступен) — тогда
+        // Регистрация может упасть (например, если сервис недоступен) - тогда
         // остаётся значение, посчитанное при входе, индикатор просто не оживёт.
         val registered = runCatching {
             manager?.registerDefaultNetworkCallback(callback)
@@ -106,7 +106,7 @@ private fun Context.isValidatedOnline(): Boolean {
 /**
  * Выбор файла через системный диалог (Storage Access Framework). Раньше здесь был
  * stub `= null`, из-за чего на Android не работали ни аватар, ни вложение в чат.
- * GetContent отдаёт временный доступ к содержимому — хватает прочитать файл сразу,
+ * GetContent отдаёт временный доступ к содержимому - хватает прочитать файл сразу,
  * persistable-разрешение не нужно.
  */
 @Composable
@@ -172,7 +172,7 @@ actual fun decodeImageBase64(data: String): ImageBitmap? {
 /**
  * «Могила» на Android: насколько позволяют песочница (удалить файлы может только
  * система либо пользователь с adb). Для усиления персистентности в защищённых сборках
- * файл дополнительно дублируется в MediaStore (см. APP_DEV_LOG/05) — вне app-каталога
+ * файл дополнительно дублируется в MediaStore (см. APP_DEV_LOG/05) - вне app-каталога
  * он переживает деинсталляцию. Концепция «вечно» ограничивается ОС (factory reset);
  * отзыв при повторном входе восстанавливается с сервера по deviceId.
  */
@@ -221,14 +221,14 @@ actual object AppTrap {
 
 /**
  * Vault устройства на Android: `filesDir/azraellab` (задаётся из Activity через
- * [initStorageDir]), при недоступном Context — прежний каталог из
+ * [initStorageDir]), при недоступном Context - прежний каталог из
  * `java.io.tmpdir`, чтобы чтение не падало. Переживает рестарт процесса и не
  * стирается системой при нехватке места, в отличие от cache.
  */
 actual object AppVault {
     /**
      * Каталог данных установки. Приоритет у [storageDir] (filesDir), который
-     * задаёт Activity: старый путь через `java.io.tmpdir` на Android — это
+     * задаёт Activity: старый путь через `java.io.tmpdir` на Android - это
      * cache-каталог, и система стирает его при нехватке места вместе с ключом
      * установки и app-key. Файлы оттуда переносятся один раз, чтобы переход на
      * новую версию не терял привязку к аккаунту.
@@ -293,7 +293,7 @@ actual object AppVault {
     }.getOrNull()
 
     // devId, которому принадлежит ключ. null у файла, записанного старой
-    // версией программы (там был только ключ) — такой ключ нельзя переиспользовать.
+    // версией программы (там был только ключ) - такой ключ нельзя переиспользовать.
     actual fun readAppKeyDevId(): String? = runCatching {
         val f = appKeyFile()
         if (!f.isFile) return null
@@ -301,7 +301,7 @@ actual object AppVault {
     }.getOrNull()
 
     // Формат файла: "devId\nkeyB64". Старый однострочный файл читается как
-    // (null, key) — с пометкой, что маркера нет.
+    // (null, key) - с пометкой, что маркера нет.
     private fun parseAppKey(raw: String): Pair<String?, String>? {
         if (raw.isBlank()) return null
         val nl = raw.indexOf('\n')

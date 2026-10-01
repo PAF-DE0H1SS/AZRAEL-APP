@@ -187,7 +187,7 @@ internal fun MainShell(
     boot: JsonObject,
     /**
      * Счётчик refresh `home.boot`. Сам по себе не состояние навигации: `Session.boot`
-     * — обычное поле, поэтому без этого счётчика `MainShell` не пересобрался бы
+     * - обычное поле, поэтому без этого счётчика `MainShell` не пересобрался бы
      * после обновления прав. Он же входит в ключ `rebase`.
      */
     bootTick: Int,
@@ -201,7 +201,7 @@ internal fun MainShell(
         defaultTab = boot.o("tabConfig")?.s("defaultTab")
     )
     if (config.items.isEmpty()) {
-        // Сервер не вернул ни одного доступного раздела (роль/конфиг) — не молчим, а объясняем.
+        // Сервер не вернул ни одного доступного раздела (роль/конфиг) - не молчим, а объясняем.
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.Center,
@@ -230,16 +230,16 @@ internal fun MainShell(
 
     // Deep link (`azrael://messages/42`). Ссылка приходит извне, поэтому права
     // проверяются в `openDeepLink(config, …)`: раздел, которого нет в tabConfig
-    // этой роли, не откроется — ни админка по прямой ссылке, ни чат без «Сообщений».
+    // этой роли, не откроется - ни админка по прямой ссылке, ни чат без «Сообщений».
     //
-    // Ключ эффекта — `deepLinkVersion`, а не `bootTick`: ссылка может прийти в
+    // Ключ эффекта - `deepLinkVersion`, а не `bootTick`: ссылка может прийти в
     // уже работающее приложение (`onNewIntent`), и раньше она молча ждала
-    // следующего refresh `tabConfig` — «нажал на ссылку, ничего не открылось».
+    // следующего refresh `tabConfig` - «нажал на ссылку, ничего не открылось».
     val deepLinkVersion = DeepLinkSignal.version
     LaunchedEffect(deepLinkVersion) {
         AppDeepLink.consume()?.let { raw ->
             if (!navigator.openDeepLink(config, raw)) {
-                // Мусор или закрытый раздел — не молчим, а остаёмся на месте:
+                // Мусор или закрытый раздел - не молчим, а остаёмся на месте:
                 // раньше такая ссылка просто игнорировалась, и ссылка «ничего не сделала».
                 logAzraelError("nav", "deep link ignored: $raw", null)
             }
@@ -263,7 +263,7 @@ internal fun MainShell(
     ) { contentModifier ->
         Column(modifier = contentModifier.fillMaxSize()) {
             // Офлайн-индикатор: сеть пропала, а список молча показывал бы старые
-            // данные — пользователь решил бы, что новых сообщений нет. Баннер стоит
+            // данные - пользователь решил бы, что новых сообщений нет. Баннер стоит
             // над шапкой и появляется только когда сети действительно нет.
             if (!rememberOnline()) {
                 AzraelBanner(
@@ -357,7 +357,7 @@ internal fun AvatarCircle(profile: AppProfile) {
 }
 
 // `tabIcon` и `SideRail` уехали в `ui/nav`: иконка раздела теперь часть `TabSpec`
-// (иначе она расходилась с `tabLabel` — «vpn_tab» и «vpn» локализовались вместе,
+// (иначе она расходилась с `tabLabel` - «vpn_tab» и «vpn» локализовались вместе,
 // а иконка знала только `vpn_tab`), а рельса рисуется тем же стеклом, что и
 // нижняя панель.
 
@@ -377,7 +377,7 @@ private fun MainContent(
 ) {
     Box(modifier = modifier) {
         when (destination) {
-            // Ключ скролла — id раздела: список «Сообщений» и AI-чат внутри него
+            // Ключ скролла - id раздела: список «Сообщений» и AI-чат внутри него
             // скроллятся независимо, а возвращение на вкладку восстанавливает
             // именно ту позицию, с которой ушли.
             is Destination.Tab -> when (destination.spec) {
@@ -392,10 +392,10 @@ private fun MainContent(
                     onOpenSetting = onOpenSetting
                 )
             }
-            // Комната чата — уже настоящий подэкран: она приходит из deep link
+            // Комната чата - уже настоящий подэкран: она приходит из deep link
             // `messages/42` и из клика по списку, поэтому её позиция скролла
             // отдельная, а «назад» возвращает в список. Остальные подэкраны
-            // появятся в P2–P4; пока показываем раздел-родитель, чтобы «назад»
+            // появятся в P2-P4; пока показываем раздел-родитель, чтобы «назад»
             // вёл туда же, куда пользователь пришёл, а не в пустоту. Settings
             // открывает подэкраны декларативно через `onOpenSetting`.
             is Destination.Detail -> when (destination.kind) {

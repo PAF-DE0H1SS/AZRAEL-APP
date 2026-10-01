@@ -328,7 +328,7 @@ internal fun AdminView(client: AppClient, profile: AppProfile, scrolls: ScrollPo
                 frozen.forEach { u ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("@${u.username}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                        Label(t("admin.frozen.state", u.frozenAt ?: "—"))
+                        Label(t("admin.frozen.state", u.frozenAt ?: "-"))
                         AccentButton(t("admin.unfreeze", u.username)) {
                             scope.launch {
                                 status = t("admin.unfreezing", u.username)

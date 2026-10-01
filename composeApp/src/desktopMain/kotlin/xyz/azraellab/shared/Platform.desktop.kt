@@ -35,7 +35,7 @@ actual fun logAzraelError(tag: String, message: String, error: Throwable?) {
 }
 
 /**
- * На десктопе сетевого менеджера с колбэками нет (и не должно быть — JVM общая),
+ * На десктопе сетевого менеджера с колбэками нет (и не должно быть - JVM общая),
  * поэтому «есть ли сеть» = «есть ли поднятый не-loopback интерфейс». Опрос по
  * таймеру: события на интерфейсах JVM не рассылает, а лезть в нативные нотификации
  * ради одного баннера дороже, чем лёгкая проверка раз в несколько секунд.
@@ -53,7 +53,7 @@ actual fun rememberOnline(): Boolean {
     return online
 }
 
-/** Интерфейс без адреса и не поднятый — сети нет; loopback («провод назад») не в счёт. */
+/** Интерфейс без адреса и не поднятый - сети нет; loopback («провод назад») не в счёт. */
 private fun hasNetwork(): Boolean = netAvailable(
     runCatching { java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty() }
         .getOrDefault(emptyList())
@@ -61,7 +61,7 @@ private fun hasNetwork(): Boolean = netAvailable(
 )
 
 /**
- * Признаки одного сетевого интерфейса — вынесены отдельно от `java.net`, чтобы
+ * Признаки одного сетевого интерфейса - вынесены отдельно от `java.net`, чтобы
  * правило можно было проверить тестом (см. `OnlineTest`) без JVM.
  */
 internal data class NetIf(val up: Boolean, val loopback: Boolean, val hasAddress: Boolean)
@@ -69,7 +69,7 @@ internal data class NetIf(val up: Boolean, val loopback: Boolean, val hasAddress
 /**
  * Сеть считается доступной, если есть хоть один поднятый не-loopback интерфейс
  * с адресом. Ни одного интерфейса (в том числе когда `getNetworkInterfaces()`
- * бросил — это тоже «не знаем») — сети нет.
+ * бросил - это тоже «не знаем») - сети нет.
  */
 internal fun netAvailable(interfaces: List<NetIf>): Boolean =
     interfaces.any { it.up && !it.loopback && it.hasAddress }
@@ -95,7 +95,7 @@ actual fun rememberFilePicker(
     val callback = rememberUpdatedState(onResult)
     return {
         scope.launch {
-            // JFileChooser блокирующий и не любит EDT — читаем файл в отдельном потоке.
+            // JFileChooser блокирующий и не любит EDT - читаем файл в отдельном потоке.
             callback.value(withContext(Dispatchers.IO) { showOpenDialog(maxBytes) })
         }
     }
@@ -141,7 +141,7 @@ private fun mimeByName(name: String): String = when (name.substringAfterLast('.'
 /**
  * «Могила» на десктопе: копии доступны в системных каталогах + immutable-атрибут
  * (chattr +i), который снимается только root-суперпользователем. Программа опирается
- * на наличие ЛЮБОЙ копии — удаление одной не снимет защиту.
+ * на наличие ЛЮБОЙ копии - удаление одной не снимет защиту.
  */
 actual object AppTrap {
     // Каталоги, не принадлежащие приложению: переживают переустановку.
@@ -187,7 +187,7 @@ actual object AppTrap {
             runCatching { ProcessBuilder("chattr", "-i", p.absolutePath).start().waitFor() }
             runCatching { p.delete() }
         }
-        // Файл во временном каталоге может быть пересоздан — вычищаем.
+        // Файл во временном каталоге может быть пересоздан - вычищаем.
         runCatching { File(System.getProperty("java.io.tmpdir"), "azraellab-device.lock").delete() }
     }
 
@@ -261,13 +261,13 @@ actual object AppVault {
     }?.let(::parseAppKey)?.second
 
     // devId, которому принадлежит ключ. null у файла, записанного старой
-    // версией программы (там был только ключ) — такой ключ нельзя переиспользовать.
+    // версией программы (там был только ключ) - такой ключ нельзя переиспользовать.
     actual fun readAppKeyDevId(): String? = appKeyFile().takeIf { it.isFile }?.let { f ->
         runCatching { f.readText().trim() }.getOrNull()
     }?.let(::parseAppKey)?.first
 
     // Формат файла: "devId\nkeyB64". Старый однострочный файл читается как
-    // (null, key) — с пометкой, что маркера нет.
+    // (null, key) - с пометкой, что маркера нет.
     private fun parseAppKey(raw: String): Pair<String?, String>? {
         if (raw.isBlank()) return null
         val nl = raw.indexOf('\n')
@@ -346,7 +346,7 @@ actual object AppLangStore {
 /**
  * Deep link на desktop. Принимается аргументом запуска вида
  * `azrael-app azrael://messages/42` (`Main.kt` разбирает `applicationArgs` и
- * вызывает [offer]) или системным свойством `azrael.deeplink` — так ссылку можно
+ * вызывает [offer]) или системным свойством `azrael.deeplink` - так ссылку можно
  * открыть из браузера/скрипта без правки кода.
  */
 actual object AppDeepLink {

@@ -18,7 +18,7 @@ namespace jni {
 // Не потокобезопасный сам по себе; используйте на JNI-потоке либо
 // приатчьте через JniThreadEnv (ниже).
 
-// jstring <-> std::string (без копирования лишний раз — использует GetStringUTFChars).
+// jstring <-> std::string (без копирования лишний раз - использует GetStringUTFChars).
 inline std::string toString(JNIEnv* env, jstring js) {
     if (!js) return {};
     const char* utf = env->GetStringUTFChars(js, nullptr);
@@ -108,7 +108,7 @@ public:
     }
 
     jclass get(JNIEnv* env) {
-        // Возвращает локальную ссылку (не удалять вручную — локальная живёт до popLocalFrame).
+        // Возвращает локальную ссылку (не удалять вручную - локальная живёт до popLocalFrame).
         jclass local = env->FindClass(name());
         return local ? local : nullptr;
     }

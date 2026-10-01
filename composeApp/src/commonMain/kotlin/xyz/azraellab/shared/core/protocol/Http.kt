@@ -15,7 +15,7 @@ object AppRuntime {
 expect fun httpPostJson(url: String, body: String, timeoutMs: Int = 10_000): String?
 
 // Платформенный HTTP GET (JSON). Нужен для открытой выдачи ключа канала при
-// первом запуске (/api/app/bootstrap) — до того, как ключ у программы ещё есть.
+// первом запуске (/api/app/bootstrap) - до того, как ключ у программы ещё есть.
 expect fun httpGetJson(url: String, timeoutMs: Int = 10_000): String?
 
 // Результат HTTP-обмена с заголовками (для защищённого конверта кастомного API).
@@ -35,10 +35,10 @@ expect fun defaultGatewayUrl(): String?
 expect fun defaultAppUrl(): String?
 
 // Ключ кастомного API (/api/app/v1) из runtime-конфига в base64 (desktop: AZRAEL_APP_KEY;
-// android: задаётся в настройках приложения). null — канал без шифрования (только подтверждение).
+// android: задаётся в настройках приложения). null - канал без шифрования (только подтверждение).
 expect fun defaultAppKeyB64(): String?
 
-// Статичный X25519-ключ (raw-32 base64) внутреннего L2-слоя (сайт НЕ расшифровывает L2 —
+// Статичный X25519-ключ (raw-32 base64) внутреннего L2-слоя (сайт НЕ расшифровывает L2 -
 // ключ _SRV_X_PUB принадлежит внутреннему роуту /v2/l2). Desktop: AZRAEL_APP_SRV_X_PUB;
 // android: задаётся в настройках приложения.
 expect fun defaultAppSrvPubB64(): String?

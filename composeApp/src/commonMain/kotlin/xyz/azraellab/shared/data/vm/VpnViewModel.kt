@@ -13,7 +13,7 @@ import xyz.azraellab.shared.data.model.VpnServerDto
 import xyz.azraellab.shared.data.model.VpnSummaryDto
 
 /**
- * Состояние вкладки VPN: сводка/список/refresh живут в StateFlow, A-WG и Incys — тоже.
+ * Состояние вкладки VPN: сводка/список/refresh живут в StateFlow, A-WG и Incys - тоже.
  * Список серверов [servers] перезагружается по выбранной папке (null = все).
  */
 class VpnViewModel(

@@ -12,7 +12,7 @@ import xyz.azraellab.shared.ui.glass
 import xyz.azraellab.shared.ui.theme.AzraelCornerGlass
 
 /**
- * Стеклянная карточка — бывшие `GlassCard` и `SurfaceGlass` в `App.kt`, но в одном API.
+ * Стеклянная карточка - бывшие `GlassCard` и `SurfaceGlass` в `App.kt`, но в одном API.
  * Скругление, заливка и рамка берутся из токенов, а не из литералов на экране.
  *
  * @param onClick если задан, карточка становится кликабельной в пределах своей области.

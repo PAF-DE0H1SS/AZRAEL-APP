@@ -7,14 +7,14 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.contentOrNull
 
-// Сырой ответ handshake от шлюза: srv_pub + токен сессии + роль RBAC (payload — base64(JSON), не зашифрован).
+// Сырой ответ handshake от шлюза: srv_pub + токен сессии + роль RBAC (payload - base64(JSON), не зашифрован).
 data class HandshakeReply(val serverPubB64: String, val sessionToken: String, val role: String = "guest")
 
 class GatewayClient(private val baseUrl: String, private val box: SessionBox = SessionBox()) {
 
     /**
      * Устанавливает защищённый канал. Поле `auth` (site-сессия) необязательно:
-     * без него роль guest, с валидной сессией — standard/admin (решает сервер).
+     * без него роль guest, с валидной сессией - standard/admin (решает сервер).
      */
     fun connect(auth: String? = null): HandshakeReply? =
         runCatching {
@@ -41,11 +41,11 @@ class GatewayClient(private val baseUrl: String, private val box: SessionBox = S
 
     fun sayHello(): String? = call(Protocol.OP_HELLO, """{"want":"echo"}""")
 
-    // ai.chat — проксируется сервером на llama-server; правда требует роль >= standard.
+    // ai.chat - проксируется сервером на llama-server; правда требует роль >= standard.
     fun aiChat(userMessage: String): String? =
         call(Protocol.OP_AI_CHAT, """{"messages":[{"role":"user","content":${jsonQuote(userMessage)}}]}""")
 
-    // cmd.ping / cmd.info — административные команды (роль admin).
+    // cmd.ping / cmd.info - административные команды (роль admin).
     fun cmdPing(): String? = call(Protocol.OP_CMD_PING, """{"cmd":"ping"}""")
     fun cmdInfo(): String? = call(Protocol.OP_CMD_INFO, """{"cmd":"info"}""")
 

@@ -25,7 +25,7 @@ class AppViewModelTest {
         val vm = ProbeViewModel(CoroutineScope(Dispatchers.Default))
         vm.load { gate.await() }
         yield()
-        // Двери ещё не отпущены — поток обязан быть в Loading.
+        // Двери ещё не отпущены - поток обязан быть в Loading.
         val loading = withTimeout(2000) { vm.s.first { it is UiState.Loading } }
         assertEquals(UiState.Loading, loading)
 
@@ -53,7 +53,7 @@ class AppViewModelTest {
             started.complete(Unit)
             gate.await()
         }
-        // Ждём, пока загрузка действительно встанет на `gate.await()` — иначе
+        // Ждём, пока загрузка действительно встанет на `gate.await()` - иначе
         // проверка зависела от того, успел ли планировщик запустить корутину, и
         // падала при случайной задержке вместо честной гонки.
         withTimeout(2000) { started.await() }

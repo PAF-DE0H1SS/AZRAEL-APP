@@ -10,11 +10,11 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 
-// `JsonElement.jsonPrimitive` БРОСАЕТ на object/array, а ответ сервера — это
+// `JsonElement.jsonPrimitive` БРОСАЕТ на object/array, а ответ сервера - это
 // наш же словарь: любой ключ может оказаться вложенным объектом, если сервер
 // расширит контракт. Раньше такой ответ ронял разбор на ИСКЛЮЧЕНИИ, а не
 // отдавал «поля нет». Поэтому приводим тип мягко (`as?`): не-primitive даёт
-// null/false, и разбор продолжается. JsonNull — подтип JsonPrimitive, его
+// null/false, и разбор продолжается. JsonNull - подтип JsonPrimitive, его
 // отсекают уже *OrNull-аксессоры (contentOrNull/longOrNull/… возвращают null).
 private fun JsonObject.prim(key: String): JsonPrimitive? = this[key] as? JsonPrimitive
 

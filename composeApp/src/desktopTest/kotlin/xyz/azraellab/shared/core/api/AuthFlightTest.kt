@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  *
  * Адрес берётся из env AZRAEL_APP_URL (по умолчанию прод:
  * https://azrael-lab.xyz/api/app/v1). Если сервер недоступен или ключевой env
- * не задан вовсе — тест тихо пропускается, чтобы CI без сети оставался зелёным.
+ * не задан вовсе - тест тихо пропускается, чтобы CI без сети оставался зелёным.
  *
  * Сценарий:
  *  - ключ канала берётся с открытой точки /api/app/bootstrap?devId=… (его не вводит пользователь);
@@ -48,7 +48,7 @@ class AuthFlightTest {
 
     /**
      * Клиент с реально полученным ключом и изолированным хранилищем;
-     * null — сервер недоступен, тест пропускается. Хранилище удаляется после теста.
+     * null - сервер недоступен, тест пропускается. Хранилище удаляется после теста.
      *
      * devId создаётся ДО запроса ключа: сервер выдаёт ключ, выведенный из devId этой
      * установки, и без него ответа не будет. Vault подменяется первым, иначе тест
@@ -62,7 +62,7 @@ class AuthFlightTest {
         homes.add(home)
         val devId = AppInstall.ensureDeviceKeys()
         val key = AppKeyBootstrap.fetch(url, devId) ?: run {
-            println("[flight] $url недоступен — тест пропускается")
+            println("[flight] $url недоступен - тест пропускается")
             return null
         }
         return AppClient(url, key) to key
@@ -150,12 +150,12 @@ class AuthFlightTest {
      * home.boot → выход → повторный вход по логину/паролю с тем же ключом привязки.
      *
      * Инвайт-код берётся из env AZRAEL_FLIGHT_INVITE: без него тест пропускается, так как
-     * создать код может только владелец (или вставка напрямую в БД — это серверный E2E).
+     * создать код может только владелец (или вставка напрямую в БД - это серверный E2E).
      */
     @Test
     fun registerThenLogoutAndLoginRoundTrip() {
         val invite = System.getenv("AZRAEL_FLIGHT_INVITE")?.takeIf { it.isNotBlank() } ?: run {
-            println("[flight] нет AZRAEL_FLIGHT_INVITE — регистрация пропущена")
+            println("[flight] нет AZRAEL_FLIGHT_INVITE - регистрация пропущена")
             return
         }
         val tag = System.nanoTime().toString().takeLast(6)
@@ -163,7 +163,7 @@ class AuthFlightTest {
         val pass = "Flight-$tag-pw"
         val first = liveClient() ?: return
 
-        // 1. Чистая установка не привязана; ключ привязки выдаёт сервер — его не вводят.
+        // 1. Чистая установка не привязана; ключ привязки выдаёт сервер - его не вводят.
         assertTrue(!first.isDeviceBound(), "чистый клиент не должен быть привязан")
 
         // 2. Регистрация: логин, пароль, инвайт, пол, аватар (1×1 PNG).
@@ -186,14 +186,14 @@ class AuthFlightTest {
         first.profileUpdate(displayName = "Flight $tag", gender = "female")
 
         // 4. Выход и повторный вход тем же аккаунтом с ключом привязки (как у пользователя,
-        //    который вошёл на втором устройстве) — главный экран снова доступен.
+        //    который вошёл на втором устройстве) - главный экран снова доступен.
         first.logout()
         val second = liveClient() ?: return
         second.authLogin(name, pass, provision)
         assertTrue(second.homeBoot().toString().contains("tabConfig"), "повторный вход не открыл главный экран")
 
         // 5. Уборка: отзываем ТОЛЬКО другие установки теста. Отзыв собственной приводит к
-        //    poison+trap от сервера, а могила ставится на всю машину — на dev-хосте это ломает
+        //    poison+trap от сервера, а могила ставится на всю машину - на dev-хосте это ломает
         //    остальные тесты. Пользователя и его одну установку удаляет mkinvite.cjs cleanup.
         runCatching {
             val own = second.deviceId()
@@ -205,13 +205,13 @@ class AuthFlightTest {
             }
             second.logout()
         }
-        println("[flight] регистрация $name (инвайт $invite) — для чистки БД: mkinvite.cjs cleanup")
+        println("[flight] регистрация $name (инвайт $invite) - для чистки БД: mkinvite.cjs cleanup")
     }
 
     private companion object {
         const val DEFAULT_URL = "https://azrael-lab.xyz/api/app/v1"
 
-        /** 1×1 прозрачный PNG в base64 — минимальный валидный аватар. */
+        /** 1×1 прозрачный PNG в base64 - минимальный валидный аватар. */
         const val PNG_1PX =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
     }

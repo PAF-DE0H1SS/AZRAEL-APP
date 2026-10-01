@@ -18,15 +18,15 @@ import xyz.azraellab.shared.data.s
  * сервере, поэтому перехват ответа на чужом устройстве не даёт ни этот ключ, ни
  * ключи остальных установок. Тот же devId клиент затем передаёт в заголовке
  * `x-azrael-kid` каждого запроса, а поверх A_dev работает штатная ротация
- * поколений — клиенту мастер не нужен.
+ * поколений - клиенту мастер не нужен.
  *
- * Зеркало `padKeyBytes()` из site/lib/app-secure.ts. XOR-pad — обфускация, а не
+ * Зеркало `padKeyBytes()` из site/lib/app-secure.ts. XOR-pad - обфускация, а не
  * криптография: смысл в том, чтобы ключ не лежал в JSON открытым текстом. Секрет
  * канала держит TLS плюс привязка значения к ключу устройства.
  */
 object AppKeyBootstrap {
 
-    /** "AZRAEL-v" — байт-в-байт как BOOTSTRAP_PAD на сервере. */
+    /** "AZRAEL-v" - байт-в-байт как BOOTSTRAP_PAD на сервере. */
     private val PAD = byteArrayOf(0x41, 0x5a, 0x52, 0x41, 0x45, 0x4c, 0x2d, 0x76)
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -34,7 +34,7 @@ object AppKeyBootstrap {
     /**
      * Адрес точки выдачи по адресу API: `https://host/api/app/v1` →
      * `https://host/api/app/bootstrap`. Если адрес уже указывает на саму точку или
-     * не содержит сегмента API — берём корень сайта.
+     * не содержит сегмента API - берём корень сайта.
      *
      * [devId] обязателен: без него сервер не может выдать ключ этой установки и
      * отвечает 400 (выдать общий ключ он больше не вправе).
@@ -64,7 +64,7 @@ object AppKeyBootstrap {
         if (obj.s("configured") != "true") return null
         val key = obj.s("key")?.takeIf { it.isNotBlank() } ?: return null
         val bytes = unpadKey(key) ?: return null
-        // Якорь канала — ровно 32 байта (AES-256). Меньше/больше — не наш ключ.
+        // Якорь канала - ровно 32 байта (AES-256). Меньше/больше - не наш ключ.
         return bytes.takeIf { it.size == 32 }
     }
 }

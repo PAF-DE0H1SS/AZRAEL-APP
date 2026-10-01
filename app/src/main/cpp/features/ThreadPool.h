@@ -14,7 +14,7 @@ namespace az {
 
 // Пул потоков (C++17). Для фонового выполнения сетевых вызовов и
 // C++-логики без создания потока на каждую задачу.
-// Пример использования — in test/ThreadPool_test.cpp.
+// Пример использования - in test/ThreadPool_test.cpp.
 
 template <typename T>
 class SafeQueue {

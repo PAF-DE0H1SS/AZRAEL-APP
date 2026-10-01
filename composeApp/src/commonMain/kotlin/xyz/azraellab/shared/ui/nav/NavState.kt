@@ -16,11 +16,11 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 
 /**
  * Back-stack приложения. Раньше «назад» работал только как «выйти из аккаунта»,
- * а разделами управлял одиночный `selectedId` — вернуться на предыдущую вкладку
+ * а разделами управлял одиночный `selectedId` - вернуться на предыдущую вкладку
  * было нельзя, и состояние вкладки терялось при перерисовке.
  *
  * Стек хранится строкой через [Saver], поэтому переживает пересоздание Activity
- * (поворот экрана) — раньше `selectedId` был `remember`, то есть терялся.
+ * (поворот экрана) - раньше `selectedId` был `remember`, то есть терялся.
  */
 @Stable
 class NavState private constructor(initial: List<Destination>) {
@@ -30,7 +30,7 @@ class NavState private constructor(initial: List<Destination>) {
      *
      * Это не оптимизация, а условие работоспособности: `MainShell` читает
      * `state.current` во время композиции, и если данные лежат в обычной коллекции,
-     * нажатие на вкладку меняло стек **без** invalidation — экран оставался на старом
+     * нажатие на вкладку меняло стек **без** invalidation - экран оставался на старом
      * разделе, пока не случилось другое перерисовывание (смена языка, приход сети).
      * Именно так было с `selectedId` до P1. `SnapshotStateList` даёт и то, и другое:
      * вне композиции (тесты, `rememberSaveable`) работает как обычный список.
@@ -49,7 +49,7 @@ class NavState private constructor(initial: List<Destination>) {
     fun navigate(destination: Destination): Boolean {
         if (destination == current) return false
         // Переход в уже открытый раздел не должен плодить дубли в стеке:
-        // выбрал вкладку, вернулся на неё — стек снова как был.
+        // выбрал вкладку, вернулся на неё - стек снова как был.
         val existing = entries.indexOfLast { it == destination }
         if (existing >= 0) {
             while (entries.size > existing + 1) entries.removeAt(entries.lastIndex)
@@ -86,7 +86,7 @@ class NavState private constructor(initial: List<Destination>) {
         if (entries.isEmpty()) {
             entries.add(destination)
         } else {
-            // Подэкран открыт — новый корень кладём под ним, иначе refresh `tabConfig`
+            // Подэкран открыт - новый корень кладём под ним, иначе refresh `tabConfig`
             // выкидывал бы из комнаты чата.
             entries.add(0, destination)
         }
@@ -130,7 +130,7 @@ private fun decodeOne(raw: String): Destination? = when {
 
 /**
  * Состояние навигации, переживающее пересоздание Activity. Saver пишет стек одной
- * строкой — формат версионируется префиксом (`t:`/`d:`/`x:`), иначе старый
+ * строкой - формат версионируется префиксом (`t:`/`d:`/`x:`), иначе старый
  * сохранённый стек после обновления схемы экранов упал бы на `decode`.
  */
 @Composable
@@ -143,9 +143,9 @@ fun rememberNavState(root: Destination): NavState {
 }
 
 /**
- * Позиции скролла по ключу пункта — раньше при возврате на вкладку список прыгал наверх.
+ * Позиции скролла по ключу пункта - раньше при возврате на вкладку список прыгал наверх.
  *
- * Словарь внутри — `mutableStateOf`, поэтому чтение `[get]` в композиции
+ * Словарь внутри - `mutableStateOf`, поэтому чтение `[get]` в композиции
  * подписывает экран на изменение, а запись из `LaunchedEffect`/`snapshotFlow`
  * перерисовывает только его.
  */
@@ -175,7 +175,7 @@ class ScrollPositions(initial: Map<String, Int> = emptyMap()) {
  * Позиции скролла переживают пересоздание Activity.
  *
  * Именно `rememberSaveable`, а не `remember`: при повороте экрана список возвращался
- * наверх, потому что карта значений жила только в памяти composable. Формат —
+ * наверх, потому что карта значений жила только в памяти composable. Формат -
  * `key=offset,key=offset`; повреждённые элементы отбрасываются поштучно.
  */
 @Composable
@@ -188,31 +188,31 @@ fun rememberScrollPositions(): ScrollPositions {
 }
 
 /**
- * Ключ скролла открытого диалога — свой на каждый чат.
+ * Ключ скролла открытого диалога - свой на каждый чат.
  *
  * Раньше комната и список жили в одной `Column` и делили одну позицию, поэтому
  * возвращение в диалог всегда показывало его с начала. Теперь комната приходит
  * как `Destination.Detail(ChatRoom, id)`, и у неё своя история: открыли второй
- * чат — вернулись в первый, он остался там же, где остановились.
+ * чат - вернулись в первый, он остался там же, где остановились.
  */
 fun roomScrollKey(chatId: Long): String = "messages.room.$chatId"
 
 /**
  * Скролл раздела, который помнит позицию при возврате на вкладку.
  *
- * Ключ — [Destination.scrollKey], то есть id раздела, а не позиция в списке:
+ * Ключ - [Destination.scrollKey], то есть id раздела, а не позиция в списке:
  * refresh `tabConfig` может вернуть разделы в другом порядке, и по позиции список
  * прыгал бы наверх.
  *
- * Пишем в [ScrollPositions] один раз — при уходе с экрана, а не на каждый кадр
+ * Пишем в [ScrollPositions] один раз - при уходе с экрана, а не на каждый кадр
  * прокрутки: держать `snapshotFlow` на пиксели бессмысленно, восстанавливать
  * надо ровно одну величину. [ScrollState] сам переживает поворот экрана через
- * свойSaver, карта — через saver [ScrollPositions].
+ * свойSaver, карта - через saver [ScrollPositions].
  *
  * Сам [key] передан в `rememberSaveable` входом, а не только в [DisposableEffect].
  * Иначе один и тот же объект [ScrollState] жил бы на все диалоги: `DisposableEffect`
  * сохранил бы старую позицию под старым ключом, но новый экран получил бы тот же
- * state — и второй чат открылся бы на середине первого.
+ * state - и второй чат открылся бы на середине первого.
  */
 @Composable
 fun rememberSectionScroll(positions: ScrollPositions, key: String): ScrollState {

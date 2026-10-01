@@ -6,7 +6,7 @@ import xyz.azraellab.shared.core.crypto.KeyPairData
 import xyz.azraellab.shared.core.crypto.randomBytes
 
 /**
- * Локальная сессия защищённого канала. Не содержит никаких секретов/адресов —
+ * Локальная сессия защищённого канала. Не содержит никаких секретов/адресов -
  * только криптографическое состояние. Транспорт (URL/HTTP) инжектится снаружи.
  */
 class SessionBox {
@@ -17,7 +17,7 @@ class SessionBox {
     val hasSession: Boolean get() = sessionToken.isNotEmpty() && serverPublicKey != null
 
     /**
-     * Собирает конверт рукопожатия. Необязательное поле `auth` — site-сессия:
+     * Собирает конверт рукопожатия. Необязательное поле `auth` - site-сессия:
      * если она валидна, сервер повышает роль канала (guest → standard/admin)
      * и отдаёт её в ответе init.
      */

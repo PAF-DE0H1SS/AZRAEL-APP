@@ -14,9 +14,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // До первого чтения vault: хранилище должно быть в filesDir, а не в
         // cache-каталоге из java.io.tmpdir, который система стирает при нехватке
-        // места — вместе с ключом установки и app-key.
+        // места - вместе с ключом установки и app-key.
         initStorageDir(filesDir.absolutePath)
-        // Ссылка azrael://messages/42 из intent'а — до setContent, потому что
+        // Ссылка azrael://messages/42 из intent'а - до setContent, потому что
         // App читает её один раз при первой композиции.
         AppDeepLink.offer(intent?.data)
         setContent {

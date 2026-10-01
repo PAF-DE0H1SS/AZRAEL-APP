@@ -10,7 +10,7 @@ import androidx.compose.runtime.remember
  * Раньше «назад» работал только как «выйти из аккаунта»: `selectedId` был обычным
  * `remember`, и ни стека, ни восстановления после поворота экрана, ни deep link не
  * было. Теперь стек живёт в [NavState] (он переживает пересоздание Activity через
- * [rememberNavState]), а этот класс — тонкий слой «что нажали» поверх него.
+ * [rememberNavState]), а этот класс - тонкий слой «что нажали» поверх него.
  */
 class Navigator(private val state: NavState) {
 
@@ -21,7 +21,7 @@ class Navigator(private val state: NavState) {
     val depth: Int get() = state.depth
 
     /**
-     * Переход в раздел. `false` — раздел недоступен этой роли или мы уже в нём:
+     * Переход в раздел. `false` - раздел недоступен этой роли или мы уже в нём:
      * вызывающий ничего не перерисовывает, и мы не теряем позицию скролла.
      */
     fun openTab(config: TabConfig, id: String): Boolean =
@@ -43,10 +43,10 @@ class Navigator(private val state: NavState) {
     /**
      * Переход по внешней ссылке: `azrael://messages/42` откроет комнату чата 42.
      *
-     * Ссылка приходит извне — из чужого приложения, из браузера, из QR — поэтому
+     * Ссылка приходит извне - из чужого приложения, из браузера, из QR - поэтому
      * права проверяются здесь, а не доверием к разобранному `Destination`.
      * Проверяется **родительский** раздел: `messages/42` требует `messages`,
-     * `settings/devices` — `settings`. Раньше метод не брал [TabConfig] вовсе и
+     * `settings/devices` - `settings`. Раньше метод не брал [TabConfig] вовсе и
      * `openDeepLink("admin")` открывал админку пользователю без прав.
      *
      * @return `false`, если ссылка мусорная, ведёт в неизвестный раздел или в
@@ -54,7 +54,7 @@ class Navigator(private val state: NavState) {
      */
     fun openDeepLink(config: TabConfig, raw: String): Boolean {
         val target = parseDestination(raw) ?: return false
-        // `Placeholder` — это раздел, которого в приложении нет. Для вкладки из
+        // `Placeholder` - это раздел, которого в приложении нет. Для вкладки из
         // `tabConfig` заглушка полезна (видно расхождение с сервером), но во внешней
         // ссылке это просто опечатка или попытка открыть то, чего нет: переходить
         // некуда, поэтому отказываем, а не показываем пустую заглушку.
@@ -69,7 +69,7 @@ class Navigator(private val state: NavState) {
      */
     fun rebase(config: TabConfig) {
         state.rebaseRoot(config.root)
-        // Если текущий корень закрыли на сервере — возвращаемся на новый корень,
+        // Если текущий корень закрыли на сервере - возвращаемся на новый корень,
         // иначе пользователь останется на экране, до которого больше нельзя добраться.
         val current = state.current
         if (current !is Destination.Detail && config.destinationOf(tabIdOf(current)) == null) {

@@ -31,11 +31,11 @@
             </intent-filter>
 
             <!-- Deep link: azrael://messages/42 открывает комнату чата 42.
-                 autoVerify не ставим — домен azrael-lab.xyz закрыт Badger'ом Pangolin
+                 autoVerify не ставим - домен azrael-lab.xyz закрыт Badger'ом Pangolin
                  и assetlinks.json там недоступен, Android всё равно не смог бы
                  подтвердить домен и показал бы выбор приложения.
 
-                 launchMode="singleTask" (см. выше) — условие доставки ссылки в
+                 launchMode="singleTask" (см. выше) - условие доставки ссылки в
                  уже работающее приложение: без него система создала бы вторую
                  Activity, и `onNewIntent` не вызывался бы вовсе, то есть
                  DeepLinkSignal.signal() не происходил бы. -->

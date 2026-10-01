@@ -44,7 +44,7 @@ class ThemeTest {
     @Test
     fun everySchemeSlotIsReadableOnItsOwnBackground() {
         // Регрессия на светлую тему: `primary = #16A34A` давал 3.0:1 с белым,
-        // а `outline = #D4D4D8` — 1.4:1. Обе схемы проверяются по всем
+        // а `outline = #D4D4D8` - 1.4:1. Обе схемы проверяются по всем
         // foreground-парам, которые реально рисует UI.
         //
         // `surface` в тёмной схеме прозрачный (5% белого), поэтому контраст
@@ -76,15 +76,15 @@ class ThemeTest {
 
     @Test
     fun outlineIsVisibleAsABoundaryInBothThemes() {
-        // Граница — не текст, но она единственное, что отделяет «стеклянную»
+        // Граница - не текст, но она единственное, что отделяет «стеклянную»
         // карточку от фона. Светлый `outline` был #D4D4D8 и давал 1.4:1, карточка
         // просто исчезала; теперь #78787F.
         //
-        // Считаем именно `contrastOver`, а не `contrast`: тёмный `outline` —
+        // Считаем именно `contrastOver`, а не `contrast`: тёмный `outline` -
         // это 40% белого (`0x66FFFFFF`), и его собственные каналы равны единице.
-        // Наивный `contrast()` увидел бы чистый белый и рапортовал 18.4:1 —
+        // Наивный `contrast()` увидел бы чистый белый и рапортовал 18.4:1 -
         // правдоподобное, но ложное число, потому что подложка под полупрозрачной
-        // границей — тёмный фон, а не белый.
+        // границей - тёмный фон, а не белый.
         listOf("dark" to AzraelDarkScheme, "light" to AzraelLightScheme).forEach { (name, scheme) ->
             val ratio = contrastOver(scheme.outline, scheme.background)
             assertTrue(
@@ -96,7 +96,7 @@ class ThemeTest {
 
     @Test
     fun alphaColorsAreMeasuredAfterCompositing() {
-        // Проверяем не сам цвет, а результат наложения: `outline` тёмной схемы —
+        // Проверяем не сам цвет, а результат наложения: `outline` тёмной схемы -
         // это 18% белого поверх почти чёрного, и по нему самому судить нельзя.
         val dark = AzraelDarkScheme
         val composited = contrastOver(AzraelBorder, dark.background)

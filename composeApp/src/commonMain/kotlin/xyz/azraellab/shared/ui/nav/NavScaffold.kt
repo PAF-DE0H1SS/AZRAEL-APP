@@ -34,7 +34,7 @@ import xyz.azraellab.shared.ui.glass
 import xyz.azraellab.shared.ui.theme.AzraelCornerGlass
 import xyz.azraellab.shared.ui.theme.AzraelSpace
 
-/** Порог, ниже которого показываем нижнюю панель, выше — боковую рельсу. Тот же, что был в `MainShell`. */
+/** Порог, ниже которого показываем нижнюю панель, выше - боковую рельсу. Тот же, что был в `MainShell`. */
 val NavWideBreakpoint: androidx.compose.ui.unit.Dp = 700.dp
 
 /**
@@ -45,7 +45,7 @@ val NavWideBreakpoint: androidx.compose.ui.unit.Dp = 700.dp
  * а иконки «прыгали» при смене ширины окна. Здесь обе ветки используют один
  * [AzraelNavigationBar] и `Modifier.glass`.
  *
- * @param onBack вызывается кнопкой «назад» в рельсе; `null` — кнопки нет.
+ * @param onBack вызывается кнопкой «назад» в рельсе; `null` - кнопки нет.
  * @param content экран текущего пункта; каркас не влияет на его содержимое.
  */
 @Composable
@@ -85,7 +85,7 @@ fun AzraelNavScaffold(
                             fill = MaterialTheme.colorScheme.surface
                         ),
                         // На телефоне рельсы нет, а раньше выход из аккаунта жил
-                        // только в ней — на узком экране выйти было нечем.
+                        // только в ней - на узком экране выйти было нечем.
                         trailing = {
                             IconButton(onClick = onLogout) {
                                 Icon(
@@ -167,11 +167,11 @@ private fun AzraelSideRail(
 }
 
 /**
- * Адаптивное «список + детали»: на широком экране две колонки, на узком — одна.
+ * Адаптивное «список + детали»: на широком экране две колонки, на узком - одна.
  *
  * [detail] nullable не для красоты: пока подэкран не открыт, на телефоне показывать
  * нечего, и пустой экран вместо списка выглядел бы как «приложение зависло».
- * `null` → узкий экран показывает список, широкий — список и [empty].
+ * `null` → узкий экран показывает список, широкий - список и [empty].
  */
 @Composable
 fun AzraelDetailLayout(

@@ -685,7 +685,7 @@ scope.launch {
                                         }
                                     }
                                     Label(
-                                        t("devices.short", devId.take(12), dev.lastSeen ?: "—") +
+                                        t("devices.short", devId.take(12), dev.lastSeen ?: "-") +
                                             t("channel.rotations", dev.rotations ?: 0)
                                     )
                                 }

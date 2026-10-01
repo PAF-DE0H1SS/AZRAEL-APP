@@ -69,7 +69,7 @@ public:
 
     // Доступ по ключу через точку: get("data/nodes[0]/node")? Нет.
     // Простая навигация: get("data.status"), get("data.vmid").
-    // Промежуточный объект или массив — смотрим через parent.get(path).
+    // Промежуточный объект или массив - смотрим через parent.get(path).
     Json get(std::string_view path) const {
         Json cur = *this;
         size_t start = 0;

@@ -3,7 +3,7 @@ package xyz.azraellab.shared.ui.nav
 import androidx.compose.runtime.Immutable
 import xyz.azraellab.shared.ui.components.AzraelNavItem
 
-/** Раздел из `tabConfig` в сыром виде — ровно то, что прислал сервер. */
+/** Раздел из `tabConfig` в сыром виде - ровно то, что прислал сервер. */
 @Immutable
 data class ServerTab(
     val id: String,
@@ -17,7 +17,7 @@ data class ServerTab(
  * Раньше вкладки были `List<Pair<String, String>>`, а экран получал `tab: String` и
  * делал `when (tab)`. Теперь id разбирается один раз здесь: неизвестное значение не
  * доходит до `when` и не может уронить UI, а остаётся как `Placeholder` с его
- * настоящим названием — видно, что расходится с сервером, а не что «экран пуст».
+ * настоящим названием - видно, что расходится с сервером, а не что «экран пуст».
  */
 @Immutable
 data class TabConfig(
@@ -27,7 +27,7 @@ data class TabConfig(
 ) {
     fun contains(id: String): Boolean = items.any { it.id == id }
 
-    /** Раздел по id; `null` — id не из `tabConfig` (например, сняли админку на сервере). */
+    /** Раздел по id; `null` - id не из `tabConfig` (например, сняли админку на сервере). */
     fun find(id: String): AzraelNavItem? = items.firstOrNull { it.id == id }
 
     /** Корень стека: настоящий [TabSpec], если id известен, иначе заглушка. */
@@ -38,7 +38,7 @@ data class TabConfig(
      * Переход к разделу по id. Права проверяются **первым делом**: сервер мог прислать
      * `admin` в `defaultTab` или в deep link, хотя роль админку не видит. Раньше
      * `destinationOf` сначала спрашивал [TabSpec] и возвращал `Destination.Tab` для
-     * любого известного id — то есть `openTab` открывал админку всем, кто знал её
+     * любого известного id - то есть `openTab` открывал админку всем, кто знал её
      * название (проверка `contains` в тестах это и поймала).
      */
     fun destinationOf(id: String): Destination? {
@@ -89,7 +89,7 @@ fun selectedTabId(state: NavState, config: TabConfig): String? {
         is Destination.Detail -> c.parentTab().tabId
     }
     // `current` не null: все три ветви `when` дают `tabId`. Пункт, которого больше
-    // нет в `tabConfig`, сюда попасть не может — его закрывает `Navigator.rebase`.
+    // нет в `tabConfig`, сюда попасть не может - его закрывает `Navigator.rebase`.
     return current.takeIf { config.contains(it) }
         ?: config.rootId.takeIf { config.contains(it) }
         ?: config.items.firstOrNull()?.id

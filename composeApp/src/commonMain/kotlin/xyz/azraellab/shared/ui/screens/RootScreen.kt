@@ -181,7 +181,7 @@ internal class Session(val client: AppClient, boot: JsonObject) {
     var boot: JsonObject = boot
 }
 
-/** Язык аккаунта из home.boot: сервер — источник истины, локальный файл — только кэш. */
+/** Язык аккаунта из home.boot: сервер - источник истины, локальный файл - только кэш. */
 internal fun applyBootLang(boot: JsonObject) {
     val lang = boot.s("lang") ?: boot.o("profile")?.s("lang")
     I18n.applyServer(lang)
@@ -211,13 +211,13 @@ internal fun rememberChannelKey(baseUrl: String): Pair<ChannelKey, () -> Unit> {
     var state by remember(baseUrl) { mutableStateOf<ChannelKey>(ChannelKey.Loading) }
     LaunchedEffect(baseUrl, attempt) {
         state = ChannelKey.Loading
-        // Сеть/файл могут бросить исключение — тогда это такой же провал, как пустой ответ.
+        // Сеть/файл могут бросить исключение - тогда это такой же провал, как пустой ответ.
         val keyB64 = withContext(Dispatchers.IO) {
             runCatching {
                 val devId = AppInstall.ensureDeviceKeys()
                 // Ключ канала выдаётся под конкретную установку, поэтому кэш годен
                 // только для того же devId. Файл, записанный старой версией
-                // программы, маркера не содержит — значит это прежний общий ключ,
+                // программы, маркера не содержит - значит это прежний общий ключ,
                 // который сервер больше не принимает: такой кэш не переиспользуем.
                 val cached = AppVault.readAppKey()
                 val cachedForUs = cached?.takeIf { AppVault.readAppKeyDevId() == devId }

@@ -43,9 +43,9 @@ fun contrastOver(fg: Color, bg: Color): Double = contrast(composite(fg, bg), bg)
 /**
  * Контраст `fg` с «эффективным» фоном схемы.
  *
- * `AzraelDarkScheme.surface` — это 5% белого (то самое стекло), поэтому
+ * `AzraelDarkScheme.surface` - это 5% белого (то самое стекло), поэтому
  * сравнивать foreground напрямую с `surface` бессмысленно: получится контраст
- * с прозрачным цветом. Реальная подложка под `surface` — `background`,
+ * с прозрачным цветом. Реальная подложка под `surface` - `background`,
  * поэтому сначала кладём `surface` на `background`, потом `fg` на результат.
  */
 fun contrastOnScheme(surface: Color, backdrop: Color, fg: Color): Double {

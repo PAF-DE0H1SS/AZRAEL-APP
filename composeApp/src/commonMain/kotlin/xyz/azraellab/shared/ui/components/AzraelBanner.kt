@@ -30,7 +30,7 @@ import xyz.azraellab.shared.ui.theme.AzraelSpace
 /**
  * Семантика баннера: иконка и тон в одной паре, чтобы не забыть иконку при новом тоне.
  *
- * Цвет раньше лежал в конструкторе enum'а — это работало, пока палитра была одна.
+ * Цвет раньше лежал в конструкторе enum'а - это работало, пока палитра была одна.
  * Со светлой темой токен перестал быть «просто зелёным/красным», и жёстко зашитый
  * `Color` в enum'е физически не может прочитать текущую `ColorScheme`. Поэтому
  * цвет вынесен в [accent], который получает схему явно, а [AzraelBanner] зовёт
@@ -42,7 +42,7 @@ enum class AzraelBannerTone(val icon: ImageVector) {
     Warning(Icons.Filled.Warning),
     Error(Icons.Filled.Warning);
 
-    /** Акцент тона в конкретной схеме; чистая функция — её и проверяет тест. */
+    /** Акцент тона в конкретной схеме; чистая функция - её и проверяет тест. */
     fun accent(scheme: ColorScheme): Color = when (this) {
         Info -> scheme.secondary
         Success -> scheme.primary
@@ -55,7 +55,7 @@ enum class AzraelBannerTone(val icon: ImageVector) {
 internal fun AzraelBannerTone.accent(): Color = accent(MaterialTheme.colorScheme)
 
 /**
- * Полоса статуса поверх формы/списка — бывший `StatusBanner`, но тон выбирается
+ * Полоса статуса поверх формы/списка - бывший `StatusBanner`, но тон выбирается
  * явно и по умолчанию стал `Info` вместо «ошибка или нет» флагом из двух булей.
  */
 @Composable

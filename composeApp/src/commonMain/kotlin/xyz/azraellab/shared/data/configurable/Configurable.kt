@@ -4,7 +4,7 @@ package xyz.azraellab.shared.data.configurable
  * Декларативное описание одной строки настроек.
  *
  * Экран собирает список [ConfigSpec] и отдаёт его в [ConfigurableList]; рендерер
- * рисует строку по типу. Новая настройка — это ещё один элемент списка, без правки
+ * рисует строку по типу. Новая настройка - это ещё один элемент списка, без правки
  * разметки экрана.
  *
  * Значения выборов намеренно строковые (без дженериков): состояние сервера приходит
@@ -12,7 +12,7 @@ package xyz.azraellab.shared.data.configurable
  * экран думать о сериализации.
  */
 sealed interface ConfigSpec {
-    /** Стабильный идентификатор строки — ключ состояния, тестов и семантики. */
+    /** Стабильный идентификатор строки - ключ состояния, тестов и семантики. */
     val key: String
 
     val title: String
@@ -20,7 +20,7 @@ sealed interface ConfigSpec {
     val desc: String?
 }
 
-/** Переключатель — состояние `true`/`false`. */
+/** Переключатель - состояние `true`/`false`. */
 data class ToggleSpec(
     override val key: String,
     override val title: String,
@@ -35,7 +35,7 @@ data class ChoiceOption(
     val label: String
 )
 
-/** Выбор одного из нескольких вариантов; значение — строка. */
+/** Выбор одного из нескольких вариантов; значение - строка. */
 data class ChoiceSpec(
     override val key: String,
     override val title: String,
