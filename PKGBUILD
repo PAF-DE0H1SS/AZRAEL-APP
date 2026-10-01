@@ -10,21 +10,34 @@ license=('custom:PolyForm-Noncommercial-1.0.0')
 makedepends=('git' 'jdk21-openjdk' 'cmake' 'ninja' 'binutils')
 depends=('jre21-openjdk')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/PAF-DE0H1SS/AZRAEL-APP/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('b4b3118a500ba52ed61765858c3e03a7664fefaebddc34c5c8f246f2a815f703')
+
+_srcdir="AZRAEL-APP-$pkgver"
 
 build() {
   export JAVA_HOME=/usr/lib/jvm/default
-  (cd "$srcdir/AZRAEL-APP-$pkgver" && ./gradlew :desktopApp:packageUberJarForCurrentOS --no-daemon --console=plain)
+  cd "$srcdir/$_srcdir"
+  ./gradlew :desktopApp:packageUberJarForCurrentOS --no-daemon --console=plain
 }
 
 package() {
-  cd "$srcdir/AZRAEL-APP-$pkgver"
+  cd "$srcdir/$_srcdir"
 
-  install -dm755 "$pkgdir/usr/bin" "$pkgdir/usr/share/azrael" "$pkgdir/usr/share/applications"
+  install -dm755 "$pkgdir/usr/bin" "$pkgdir/usr/share/azrael" \
+    "$pkgdir/usr/share/applications" "$pkgdir/usr/share/licenses/azrael-app"
 
+  local jar found=1
   for jar in desktopApp/build/compose/jars/*.jar; do
-    cp "$jar" "$pkgdir/usr/share/azrael/azrael-app.jar"
+    [ -f "$jar" ] || continue
+    install -Dm644 "$jar" "$pkgdir/usr/share/azrael/azrael-app.jar"
+    found=0
   done
+  if [ "$found" -ne 0 ]; then
+    echo "no jar produced in desktopApp/build/compose/jars/" >&2
+    return 1
+  fi
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/azrael-app/LICENSE"
 
   cat > "$pkgdir/usr/bin/azrael" <<EOF
 #!/bin/sh
