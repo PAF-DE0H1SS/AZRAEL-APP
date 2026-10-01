@@ -1,9 +1,14 @@
 # AZRAEL-APP: рабочая память - P2 «декларативные настройки» (handoff)
 
-Статус: **в работе**. Создан для постоянного хранения состояния сессии (не в /tmp).
-Обновляется по мере выполнения; финальный актуальный источник - `docs/ui-redesign-plan.md`.
+Статус: **закрыт, архив**. Это рабочая память момента начала P2 (2026-09-28/29), а не
+описание текущего состояния кода. Описание того, как устроены настройки сейчас, -
+в §12 в конце файла; журнал этапов P0-P5 - в `docs/ui-redesign-plan.md`.
 
-## 0. Как возобновить сессию
+Важно: приведённые ниже номера строк (`App.kt:2738-3425`), имена `SettingsView`,
+`ThemeManager.toggler`, `onThreat` и ожидания тестов (104/104) исторические. `App.kt`
+сейчас - 20 строк, `ThemeManager` не существует, тестов 183.
+
+## 0. Как возобновить сессию (только если работа продолжается с этой точки)
 1. Прочитать этот файл целиком.
 2. Проверить актуальные границы блока `SettingsView` в App.kt (см. §2).
 3. Делать TODO-задачи из §6 строго по порядку.
@@ -222,3 +227,70 @@ private fun SettingsView(
 - P1 (навигация) - закрыт.
 - P2 (настройки): подготовка 100% (все сигнатуры/границы/i18n проверены),
   сам код нового блока ещё не написан и не вшит.
+
+## 12. Фактическое состояние после закрытия P2-P5 (записано 2026-10-01)
+
+P2 выполнен, но итоговая реализация отличается от этого плана. Ниже - что в коде
+сейчас; §1-§11 оставлены как есть, чтобы был виден ход работы.
+
+### Критерий приёмки - достигнут
+
+«Новая настройка добавляется строкой описания списка» работает:
+
+- `data/configurable/Configurable.kt` (67 строк) - `sealed interface ConfigSpec` с
+  вариантами `ToggleSpec`, `ChoiceSpec` (+`ChoiceOption`), `FieldSpec`, `ActionSpec`;
+  у полей есть `secret` (пароли, provision-ключ).
+- `data/configurable/ConfigurableList.kt` (175 строк) - рендер `ConfigurableList(...)`
+  и `ConfigGroup(...)` в общие компоненты `ui/components/`.
+- Рендер декларативный, экран не содержит per-field `if`.
+
+### Где лежит экран настроек
+
+`ui/screens/SettingsScreen.kt` (925 строк) - был монолитный блок `SettingsView` из
+`App.kt:2738-3425`. Реализовано как `SettingsTile`-список + dispatch по id секции.
+
+Разделы (id в `when (selected.id)`, строки 192-197):
+
+| id | титул | что внутри |
+|---|---|---|
+| `account` | `account.title` | профиль, аватар, пол, язык, refresh |
+| `security` | `security.title` | пароль, OTP issue/validate, revoke session, provision show/regen |
+| `devices` | `devices.title` | список устройств, revoke, rotate L2, deviceStatus, OTP copy |
+| `privacy` | `privacy.title` | hidden_from_search, who_search, who_write, auto-delete |
+| `appearance` | `appearance.title` | тема system/dark/light |
+| `channel` | `channel.title` | L2 pub apply, gateway URL + handshake, health, logout, delete profile |
+
+### Что поменялось против плана §1-§11
+
+- **`onThreat` убран** - как и планировалось; `ThreatMode` в настройках больше нет.
+- **Тема**: `ThemeManager.toggler` не существует и не существовал в этой ветке;
+  переключение идёт через `AzraelThemeState` (`ui/theme/Theme.kt`), режим переживает
+  перезапуск (`AppThemeStore`, desktop `~/.config/azraellab/theme`, Android
+  `AppVault.baseDir()`).
+- **Инвайты** действительно переехали в админку - `ui/screens/AdminScreen.kt`
+  (список/архив/генерация, мой код), состояние через `AppViewModel`.
+- **Состояние ушло из UI**: `data/vm/SettingsViewModel.kt` держит
+  `devices`/`privacy`/`provision`/`avatarUrl` как `StateFlow<UiState<T>>` и все
+  suspend-действия (`savePrivacy`, `revokeDevice`, `rotateDeviceKey`,
+  `otpGenerateSecret`, `otpValidate`, `changePassword`, `revokeSession`,
+  `verifySession`, `healthText`, `saveProfile`, `setLang`, `setAutoDelete`,
+  `avatarSet`, `deleteProfile`, `isL2Available`). Экран только читает `UiState`
+  и рисует Loading/Error/Empty.
+- **Валидация списков автоудаления** вынесена в `Repos.AUTODELETE_DAYS` и
+  `Repos.PROFILE_AUTODELETE_DAYS` и проверяется **до** сетевого вызова
+  (тест `AutodeleteDaysTest`).
+- **`chats.autodelete` на сервере не валидирует `chatId`** и отвечает `{ok:true}`
+  при 0 задетых строк - клиент защищён своей проверкой, но серверный дефект открыт
+  (см. `APP_DEV_LOG/13-app-v1-133-hardening-release-prep.md`, TODO 5).
+
+### Ссылки на код, действительные сейчас
+
+- `ui/screens/SettingsScreen.kt` - экран и dispatch секций.
+- `ui/screens/AdminScreen.kt` - инвайты.
+- `ui/theme/Theme.kt` + `ui/theme/Color.kt` - `AzraelThemeState`, палитра.
+- `data/vm/SettingsViewModel.kt` - состояние и действия.
+- `data/repo/Repos.kt` - `AUTODELETE_DAYS`, `PROFILE_AUTODELETE_DAYS`, репозитории.
+- `data/configurable/` - декларативные спеки и рендер.
+- `core/api/AppClient.kt` - методы, вызываемые репозиториями.
+
+Тесты: 183 (весь набор `:composeApp:desktopTest`), не 104.

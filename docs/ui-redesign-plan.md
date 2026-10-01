@@ -1,8 +1,12 @@
 # AZRAEL-APP: план редизайна UI/UX и реструктуризации функциональности
 
-Статус: в работе. Этап P0 (дизайн-система) закрыт полностью: токены, тема и 12 базовых
-компонентов. Дальше - P1 (навигация).
-Обновляется по мере выполнения; прогресс фиксируется в разделе «Журнал выполнения».
+Статус: этапы P0-P5 закрыты. Редизайн вошёл в релиз - первая публикация `v1.3.2`,
+стабильный релиз `v1.3.3` (2026-10-01). Открыты три пункта из P5: ручной
+авторизованный смоук (нужен тестовый аккаунт или `AZRAEL_FLIGHT_INVITE`),
+desktop render-тесты Compose (нужен `compose.ui-test` в кэше Gradle) и
+runtime-проверка на реальных Windows 10/11 и Android-устройстве.
+Журнал этапов ниже остаётся историческим и не переписывается; итоговая сводка и
+фактическое состояние файлов - в разделе «Итог» в конце файла.
 
 Референсы (выбраны пользователем, решение зафиксировано):
 - `dev778g-me/Kore` - дизайн-система: token-слой + компоненты по одной директории.
@@ -679,3 +683,56 @@ SUCCESSFUL; `:composeApp:desktopTest --offline --rerun-tasks` - BUILD SUCCESSFUL
 **Остаток P5**: ручной смоук (вход → чат → файл → сокращатель → VPN → админка) - нужен
 тестовый аккаунт или `AZRAEL_FLIGHT_INVITE`. Compose render-тесты офлайн невозможны:
 `compose.ui-test` нет в кэше Gradle.
+
+## Итог (актуально на v1.3.3, 2026-10-01)
+
+Журнал выше - историческая хроника этапов; ниже - то, что важно знать сегодня.
+
+### Что закрыто
+
+| Этап | Содержание | Состояние |
+|---|---|---|
+| P0 | дизайн-система: токены, светлая тема, 15 компонентов | закрыт |
+| P1 | навигация: back-stack, deep links, `AdaptiveDetailLayout`, маппинг `tabConfig` | закрыт |
+| P2 | декларативные настройки: `data/configurable/`, 6 секций, инвайты в админку | закрыт |
+| P3 | DTO/репозитории/ViewModel, состояние на `StateFlow`/`UiState` | закрыт |
+| P4 | разбивка монолита: 9 экранов в `ui/screens/`, `App.kt` = 20 строк | закрыт |
+| P5 | состояния Loading/Empty/Error, контракт WCAG, тематический фон, вычистка `Color.White` | закрыт, кроме трёх пунктов ниже |
+
+Релизы: первая публикация редизайна - `v1.3.2` (pre-release), стабильная - `v1.3.3`.
+
+### Тесты
+
+`:composeApp:desktopTest --offline --rerun-tasks` - 183 теста, 0 failures.
+Эволюция по этапам: 124 → 135 (промежуточная проверка P0-P4) → 146 (P5) → 183 (`v1.3.3`).
+Числа из промежуточных записей журнала не суммировать: каждый прогон пересчитывает весь
+набор заново.
+
+### Фактическая структура
+
+```
+composeApp/src/commonMain/kotlin/xyz/azraellab/shared/
+├── App.kt                       20 строк: AppThemeRoot + GlassBackground + AppRoot
+├── I18n.kt + I18nApp/Chats/Tools.kt   365 ключей RU/EN/ZH, доменная нарезка
+├── core/api/        AppClient (63 операции), AppSecure, AppKeyBootstrap, AppInstall
+├── core/crypto/     Ed25519, SHA-512, Fe25519 - чистый Kotlin в commonMain
+├── core/protocol/   Envelope, SessionBox, GatewayClient, Http (expect/actual)
+├── data/            model/, repo/Repos.kt, vm/ (AppViewModel, ChatsViewModel, SettingsViewModel),
+│                    configurable/ (ConfigSpec)
+├── ui/components/   15 файлов (AzraelButton, AzraelCard, ... AzraelEmptyState)
+├── ui/nav/          Routes, NavState, Navigator, NavHost, NavScaffold, TabConfig
+├── ui/screens/      9 файлов (RootScreen, LoginScreen, MainShellScreen, ChatsScreen, ...)
+├── ui/theme/        Color, Type, Shape, Spacing, Ripple, Theme
+└── ui/common/       ScreenKit (общие примитивы экранов)
+```
+
+### Осталось открытым
+
+1. **Ручной авторизованный смоук** (вход → чат → файл → сокращатель → VPN → админка) -
+   нужен тестовый аккаунт или `AZRAEL_FLIGHT_INVITE`. Единственный непроверенный путь
+   end-to-end.
+2. **Compose render-тесты** - `compose.ui-test` отсутствует в кэше Gradle, офлайн
+   недоступны. Проверено косвенно: запуск под Xvfb в обеих темах, плюс `ContrastTest`
+   (контрактные функции цветов, а не скрипт с продублированными числами).
+3. **Windows 10/11 runtime** и **Android device smoke** - CI собирает MSI и APK, но
+   ручная проверка на реальном устройстве не выполнялась.
