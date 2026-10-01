@@ -112,9 +112,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import xyz.azraellab.shared.core.api.AppClient
 import xyz.azraellab.shared.core.api.AppInstall
 import xyz.azraellab.shared.core.api.AppErrorCode
@@ -179,16 +184,23 @@ import xyz.azraellab.shared.ui.vm.rememberViewModel
 
 // ---- Данные кастомного API (POST /api/app/v1), контракт APP_DEV_LOG/02/04 ----
 
-internal fun JsonObject.s(key: String): String? = this[key]?.jsonPrimitive?.content
-internal fun JsonObject.l(key: String): Long? = this[key]?.jsonPrimitive?.content?.toLongOrNull()
-internal fun JsonObject.i(key: String): Int? = this[key]?.jsonPrimitive?.content?.toIntOrNull()
-internal fun JsonObject.o(key: String): JsonObject? = this[key]?.jsonObject
+// Дубли data/Json.kt. Раньше здесь стояло `this[key]?.jsonPrimitive?.content`, что
+// бросает IllegalArgumentException, если сервер прислал на месте строки объект или
+// массив: `jsonPrimitive` на не-primitive не optional. `as?` вместо `.jsonPrimitive`
+// даёт на не-primitive null вместо исключения — то же самое, что в data/Json.kt, и
+// тот же набор расширений; менять надо оба сразу.
+private fun JsonObject.primOrNull(key: String): JsonPrimitive? = this[key] as? JsonPrimitive
+
+internal fun JsonObject.s(key: String): String? = primOrNull(key)?.contentOrNull
+internal fun JsonObject.l(key: String): Long? = primOrNull(key)?.longOrNull
+internal fun JsonObject.i(key: String): Int? = primOrNull(key)?.intOrNull
+internal fun JsonObject.o(key: String): JsonObject? = this[key] as? JsonObject
 internal fun JsonObject.a(key: String): List<JsonElement> =
     this[key]?.let { runCatching { it.jsonArray }.getOrNull() }?.toList() ?: emptyList()
 
 internal fun JsonElement.boolValue(): Boolean {
-    val text = runCatching { jsonPrimitive.content }.getOrNull() ?: return false
-    return text == "true" || text == "1"
+    val p = runCatching { jsonPrimitive }.getOrNull() ?: return false
+    return p.booleanOrNull == true || p.contentOrNull == "1"
 }
 
 /** Настоящий JSON-boolean: сервер шлёт true/false, но в MariaDB-полях встречается 0/1. */
@@ -310,6 +322,8 @@ internal fun errText(e: Throwable): String = if (e is AppException) {
             AppErrorCode.MALFORMED -> t["error.malformed"]
             AppErrorCode.SESSION -> t["error.session"]
             AppErrorCode.FORBIDDEN -> t["error.forbidden"]
+            AppErrorCode.L2_REQUIRED -> t["error.l2.required"]
+            AppErrorCode.L2_UNAVAILABLE -> t["error.l2.unavailable"]
             AppErrorCode.INVALID_CRED -> t["error.credentials"]
             AppErrorCode.USER_EXISTS -> t["error.userExists"]
             AppErrorCode.INVITE_BAD -> t["error.invite"]
@@ -317,7 +331,12 @@ internal fun errText(e: Throwable): String = if (e is AppException) {
             else -> t("error.code", e.code)
         }
         val detail = e.message?.trim().orEmpty()
-        if (detail.isEmpty() || detail == "err=${e.code}") base else "$base — $detail"
+        // Для кодов L2 detail не дописываем: серверные тексты там технические
+        // и английские ('l2 gateway error'), а своя строка уже объясняет причину
+        // и что делать. Остальные коды оставляем как есть — потеря контекста
+        // сервера полезнее, чем «Ошибка 204 — validation failed».
+        if (e.code == AppErrorCode.L2_REQUIRED || e.code == AppErrorCode.L2_UNAVAILABLE) base
+        else if (detail.isEmpty() || detail == "err=${e.code}") base else "$base — $detail"
     }
 } else {
     t("error.crash", e.message)

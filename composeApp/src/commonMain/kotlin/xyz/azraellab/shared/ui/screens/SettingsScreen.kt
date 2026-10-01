@@ -171,6 +171,7 @@ import xyz.azraellab.shared.ui.theme.AzraelSpace
 import xyz.azraellab.shared.data.UiState
 import xyz.azraellab.shared.data.model.DeviceDto
 import xyz.azraellab.shared.data.model.DeviceListDto
+import xyz.azraellab.shared.data.Repos
 import xyz.azraellab.shared.data.vm.AdminViewModel
 import xyz.azraellab.shared.data.vm.ChatsViewModel
 import xyz.azraellab.shared.data.vm.SettingsViewModel
@@ -484,12 +485,19 @@ internal fun SettingsView(
                                 key = "autoDelete",
                                 title = t["profile.autoDelete"],
                                 desc = t["profile.autoDelete.hint1"] + t("profile.autoDelete.now", autoDeleteState(autoDeleteDays)),
-                                options = listOf(
-                                    ChoiceOption("", t["off"]),
-                                    ChoiceOption("30", t["d30s"]),
-                                    ChoiceOption("90", t["d90"]),
-                                    ChoiceOption("365", t["d365"])
-                                ),
+                                // Сроки берутся из Repos.PROFILE_AUTODELETE_DAYS: UI и
+                                // проверка в Repos.autoDeleteSet не должны разъезжаться
+                                // по набору, иначе можно выбрать срок, который потом
+                                // не снимется.
+                                options = Repos.PROFILE_AUTODELETE_DAYS.map { d ->
+                                    val label = when (d) {
+                                        null -> t["off"]
+                                        30 -> t["d30s"]
+                                        365 -> t["d365"]
+                                        else -> t["d$d"]
+                                    }
+                                    ChoiceOption(d?.toString() ?: "", label)
+                                },
                                 value = autoDeleteDays?.toString() ?: "",
                                 onSet = { raw ->
                                     val d = raw.toIntOrNull()
@@ -725,7 +733,7 @@ scope.launch {
                                 scope.launch {
                                     status = "…"
                                     when (val r = vm.deviceStatusLabel()) {
-                                        is UiState.Ready -> status = t("devices.statusRow", r.data)
+                                        is UiState.Ready -> status = if (r.data.isBlank()) t["notBound"] else t("devices.statusRow", r.data)
                                         is UiState.Error -> status = r.message
                                         UiState.Loading -> Unit
                                     }

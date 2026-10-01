@@ -2,9 +2,9 @@ package xyz.azraellab.shared.core.api
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import xyz.azraellab.shared.core.crypto.Base64Codec
 import xyz.azraellab.shared.core.protocol.httpGetJson
+import xyz.azraellab.shared.data.s
 
 /**
  * Первичная выдача ключа канала при первом запуске.
@@ -60,9 +60,9 @@ object AppKeyBootstrap {
     fun fetch(apiUrl: String, devId: String, timeoutMs: Int = 8_000): ByteArray? {
         val text = httpGetJson(bootstrapUrl(apiUrl, devId), timeoutMs) ?: return null
         val obj = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
-        if (obj["ok"]?.jsonPrimitive?.content != "true") return null
-        if (obj["configured"]?.jsonPrimitive?.content != "true") return null
-        val key = obj["key"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: return null
+        if (obj.s("ok") != "true") return null
+        if (obj.s("configured") != "true") return null
+        val key = obj.s("key")?.takeIf { it.isNotBlank() } ?: return null
         val bytes = unpadKey(key) ?: return null
         // Якорь канала — ровно 32 байта (AES-256). Меньше/больше — не наш ключ.
         return bytes.takeIf { it.size == 32 }

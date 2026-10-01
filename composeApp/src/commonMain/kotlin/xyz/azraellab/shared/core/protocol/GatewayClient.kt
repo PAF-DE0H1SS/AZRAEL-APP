@@ -3,8 +3,9 @@ package xyz.azraellab.shared.core.protocol
 import xyz.azraellab.shared.core.crypto.Base64Codec
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 // Сырой ответ handshake от шлюза: srv_pub + токен сессии + роль RBAC (payload — base64(JSON), не зашифрован).
 data class HandshakeReply(val serverPubB64: String, val sessionToken: String, val role: String = "guest")
@@ -22,10 +23,10 @@ class GatewayClient(private val baseUrl: String, private val box: SessionBox = S
             val env = json.decodeFromString(Envelope.serializer(), reply)
             if (env.err != Protocol.ERR_OK) return null
             val payloadJson = String(Base64Codec.decode(env.payload))
-            val obj = json.parseToJsonElement(payloadJson).jsonObject
-            val pub = obj["srv_pub"]?.jsonPrimitive?.content ?: return null
-            val token = obj["session"]?.jsonPrimitive?.content ?: return null
-            val role = obj["role"]?.jsonPrimitive?.content ?: "guest"
+            val obj = runCatching { json.parseToJsonElement(payloadJson).jsonObject }.getOrNull() ?: return null
+            val pub = (obj["srv_pub"] as? JsonPrimitive)?.contentOrNull ?: return null
+            val token = (obj["session"] as? JsonPrimitive)?.contentOrNull ?: return null
+            val role = (obj["role"] as? JsonPrimitive)?.contentOrNull ?: "guest"
             if (!box.acceptServer(pub, token)) return null
             HandshakeReply(pub, token, role)
         }.getOrNull()

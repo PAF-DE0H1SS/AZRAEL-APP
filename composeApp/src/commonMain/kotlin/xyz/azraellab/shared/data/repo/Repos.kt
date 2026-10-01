@@ -82,19 +82,48 @@ object Repos {
         client.chatsCreate(uid.toString()).o("chat")?.l("id") ?: 0L
     }
 
-    /** Открыть диалог: сообщения, имя собеседника и срок автоудаления. */
-    suspend fun openChat(client: AppClient, chatId: Long, myId: Long): UiState<RoomDto> = runStateIO {
+    /**
+     * Открыть диалог: сообщения, имя собеседника и срок автоудаления.
+     *
+     * Имя приходит СНАРУЖУ ([name]), а не из ответа: `chats.open` на сервере
+     * возвращает только `{ chat: { id }, messages }` — ни `items`, ни `partner`.
+     * Читать имя из ответа было ошибкой: `ChatDto.fromList` брал `items`,
+     * которых там нет, и имя всегда становилось пустым. Лишнего запроса за
+     * именем не делаем — оно уже есть в загруженном списке диалогов.
+     */
+    suspend fun openChat(client: AppClient, chatId: Long, myId: Long, name: String = ""): UiState<RoomDto> = runStateIO {
         val d = client.chatsOpen(chatId)
         RoomDto(
             msgs = ChatMessageDto.fromList(d, myId),
-            name = ChatDto.fromList(d).firstOrNull()?.name ?: "",
+            name = name,
             days = client.chatsAutodeleteGet(chatId).i("days")
         )
     }
 
-    suspend fun autodeleteSet(client: AppClient, chatId: Long, days: Int?): UiState<Int?> = runStateIO {
-        client.chatsAutodeleteSet(chatId, days)
-        days
+    /**
+     * Сроки автоудаления, которые программа предлагает: `null` — выключено.
+     * Единственный источник правды для UI (ChatsScreen) и для проверки ниже.
+     */
+    val AUTODELETE_DAYS: List<Int?> = listOf(null, 1, 7, 30)
+
+    /**
+     * Сроки для профиля: длиннее, чем у чата (профиль живёт месяцами, чат —
+     * дни). Держим отдельно от [AUTODELETE_DAYS], но по той же причине и с той же
+     * проверкой, что и он: сервер `profile.autodelete.set` диапазон не валидирует
+     * и молчит об успехе.
+     */
+    val PROFILE_AUTODELETE_DAYS: List<Int?> = listOf(null, 30, 90, 365)
+
+    suspend fun autodeleteSet(client: AppClient, chatId: Long, days: Int?): UiState<Int?> {
+        // Сервер (server_appv1.ts, 'chats.autodelete.set') диапазон не проверяет и молча
+        // отвечает ok даже при 0 затронутых строк. Поэтому срок, которого нет в
+        // AUTODELETE_DAYS, не отправляем: иначе чат навсегда остался бы с
+        // произвольным сроком, который UI потом не покажет и не сможет снять.
+        if (days != null && days !in AUTODELETE_DAYS) return UiState.Error("autodelete days not allowed: $days")
+        return runStateIO {
+            client.chatsAutodeleteSet(chatId, days)
+            days
+        }
     }
 
     suspend fun sendMessage(client: AppClient, chatId: Long, text: String?, fileToken: String?): UiState<Unit> = runStateIO {
@@ -243,8 +272,14 @@ object Repos {
         Unit
     }
 
+    /**
+     * Статус ТЕКУЩЕЙ установки. Для непривязанной установки сервер отдаёт
+     * `{ bound: false, devId: null }` — `status` там отсутствует, и прежний код
+     * превращал это в "?" (вопросительный знак в UI). Теперь возвращаем пустую
+     * строку и отдаём выбор подписи экрану: он печатает «не привязан».
+     */
     suspend fun deviceStatusLine(client: AppClient): UiState<String> = runStateIO {
-        client.deviceStatus().s("status") ?: "?"
+        DeviceDto.from(client.deviceStatus()).status ?: ""
     }
 
     suspend fun otpSecret(client: AppClient): UiState<String> = runStateIO {
@@ -286,9 +321,14 @@ object Repos {
         Unit
     }
 
-    suspend fun autoDeleteSet(client: AppClient, days: Int?): UiState<Int?> = runStateIO {
-        client.profileAutoDelete(days)
-        days
+    suspend fun autoDeleteSet(client: AppClient, days: Int?): UiState<Int?> {
+        if (days != null && days !in PROFILE_AUTODELETE_DAYS) {
+            return UiState.Error("autodelete days not allowed: $days")
+        }
+        return runStateIO {
+            client.profileAutoDelete(days)
+            days
+        }
     }
 
     suspend fun profileAvatarSet(client: AppClient, base64: String, mime: String): UiState<String> = runStateIO {
