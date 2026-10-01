@@ -71,10 +71,26 @@ class ChatsViewModel(
 
     suspend fun reloadRoom(chatId: Long): UiState<RoomDto> {
         _room.value = UiState.Loading
-        val st = Repos.openChat(client, chatId, myId)
+        val st = Repos.openChat(client, chatId, myId, resolveName(chatId))
         _room.value = st
         return st
     }
+
+    /**
+     * Имя собеседника для заголовка комнаты.
+     *
+     * `chats.open` имя не возвращает (см. [Repos.openChat]), поэтому оно берётся из
+     * списка диалогов. Deep link `azrael://messages/<id>` открывает комнату раньше,
+     * чем список приходит: на узком экране список вообще не композится, а на
+     * широком гонка `LaunchedEffect(chatId)` с `refresh()` решается случайно. Тогда
+     * имя оставалось пустым и заголовок комнаты был пустым.
+     *
+     * Доп. запрос нужен только в этом случае — в обычном пути список уже загружен.
+     */
+    private suspend fun resolveName(chatId: Long): String =
+        chatRoomName(chatId, _chats.value, _archived.value) {
+            Repos.chats(client).also { _chats.value = it }
+        }
 
     /** Перечитать сообщения комнаты, не трогая имя и автоудаление. */
     suspend fun reloadMessages(chatId: Long): UiState<Unit> {
@@ -126,4 +142,33 @@ class ChatsViewModel(
         val old = _room.value.getOrNull() ?: return
         _room.value = UiState.Ready(old.copy(msgs = old.msgs.filterNot { it.id == id }))
     }
+}
+
+/**
+ * Имя для заголовка комнаты — чистая функция, без сети внутри.
+ *
+ * `chats.open` на сервере возвращает только `{ chat: { id }, messages }`, ни `items`,
+ * ни `partner`, поэтому имя собеседника приходится брать из уже загруженного списка
+ * диалогов. Deep link `azrael://messages/<id>` открывает комнату раньше списка:
+ * на узком экране список вообще не композится, на широком `LaunchedEffect(chatId)`
+ * обгоняет `refresh()`. Тогда имя оставалось пустым.
+ *
+ * Правило: сначала ищем в активном списке, потом в архиве, и только если имя не
+ * найдено И список ещё грузится — один раз догружаем его через [loadChats]. Доп.
+ * запрос появляется только на этом пути; в обычном [loadChats] не вызывается.
+ * Пустая строка — осознанный ответ «имени нет» (чат удалён или чужой), UI рисует
+ * нейтральный заголовок.
+ */
+internal suspend fun chatRoomName(
+    chatId: Long,
+    chats: UiState<List<ChatDto>>,
+    archived: UiState<List<ChatDto>>,
+    loadChats: suspend () -> UiState<List<ChatDto>>
+): String {
+    fun pick(state: UiState<List<ChatDto>>) =
+        state.getOrNull()?.firstOrNull { it.id == chatId }?.name?.takeIf { it.isNotBlank() }
+    pick(chats)?.let { return it }
+    pick(archived)?.let { return it }
+    if (chats !is UiState.Ready) pick(loadChats())?.let { return it }
+    return ""
 }

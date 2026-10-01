@@ -8,8 +8,8 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.contentOrNull
 import xyz.azraellab.shared.AppTrap
 import xyz.azraellab.shared.AppVault
 import xyz.azraellab.shared.Hex
@@ -163,12 +163,43 @@ object AppErrorCode {
     const val USER_EXISTS = 202
     const val INVITE_BAD = 203
     const val VALIDATION = 204
-    const val L2_REQUIRED = 108
-    const val L2_UNAVAILABLE = 107
     const val FROZEN = 109
+    // Слои L2. Сервер для тех же ситуаций отдаёт 108 ('l2 envelope required',
+    // 'l2 eph required') и 107 ('l2 unavailable', 'l2 gateway error') — те же
+    // коды, что у него означают обычный Forbidden и внутреннюю ошибку, поэтому
+    // клиентские коды берутся из свободного диапазона 120+ и приводятся к ним
+    // в l2AwareErrorCode: иначе «L2 на устройстве недоступен» не отличить от
+    // «доступ запрещён», а errText покажет чужой текст.
+    const val L2_REQUIRED = 120
+    const val L2_UNAVAILABLE = 121
 
     // Локальная (клиентская) ошибка транспорта, сервером не выставляется.
     const val NETWORK = -1
+}
+
+/**
+ * L2 в сообщении сервера — отдельным словом, а не хвостом другого идентификатора.
+ * `\b` отсекает «mysql2», но не «l2-слой» и не «app-l2»: последний сервер не
+ * присылает (это путь импорта в нашем же коде), так что ловить его не нужно.
+ */
+private val L2_MESSAGE_RE = Regex("\\bl2\\b", RegexOption.IGNORE_CASE)
+
+/**
+ * Переводит серверный код ошибки в клиентский там, где сервер говорит именно про L2.
+ *
+ * Отличать L2-ошибки приходится по тексту: 108 у сервера — это ещё и обычный
+ * Forbidden (например, гостевой `chatSend`), а 107 — обычная внутренняя ошибка,
+ * так что remap по одному коду сломал бы обе. Правило узкое: код 107/108 и
+ * серверское сообщение с отдельным словом `l2`. Тогда `chats.archive` гостю по-прежнему
+ * показывает «Доступ запрещён», а обрыв L2 — «L2 недоступен» с подсказкой.
+ */
+internal fun l2AwareErrorCode(code: Int, message: String?): Int {
+    if (!L2_MESSAGE_RE.containsMatchIn(message.orEmpty())) return code
+    return when (code) {
+        AppErrorCode.FORBIDDEN -> AppErrorCode.L2_REQUIRED
+        AppErrorCode.INTERNAL -> AppErrorCode.L2_UNAVAILABLE
+        else -> code
+    }
 }
 
 class AppException(val code: Int, message: String) : Exception(message) {
@@ -270,21 +301,48 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
     private fun loadPersistedState(): DeviceKeys? {
         val raw = AppVault.read() ?: return null
         val obj = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return null
-        token = obj["token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        savedLogin = obj["login"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        savedPassword = obj["pass"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val hasBoundFlag = obj["bound"] != null
-        deviceBound = hasBoundFlag && obj["bound"]?.jsonPrimitive?.content == "true"
-        val devId = obj["devId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: return null
-        val priv = obj["devPriv"]?.jsonPrimitive?.content
-            ?.let { runCatching { Base64Codec.decode(it) }.getOrNull() } ?: return null
-        val pub = obj["devPub"]?.jsonPrimitive?.content
-            ?.let { runCatching { Base64Codec.decode(it) }.getOrNull() } ?: return null
-        if (priv.size != 32 || pub.size != 32) return null
-        // Старый vault без флага: тогда ключи и означали привязку.
-        if (!hasBoundFlag) deviceBound = true
-        return DeviceKeys(devId, priv, pub)
+        // Всё через contentOrNull и под runCatching: функция вызывается в
+        // инициализаторе поля, то есть ВНЕ try/catch вызывающего кода. Раньше
+        // `jsonPrimitive` на не-primitive (например, битый vault с объектом на
+        // месте token) бросал IllegalArgumentException и ронял создание клиента
+        // вместе со стартом программы. Повреждённый vault должен давать null.
+        return runCatching {
+            token = obj.strOrNull("token")
+            savedLogin = obj.strOrNull("login")
+            savedPassword = obj.strOrNull("pass")
+            val hasBoundFlag = obj["bound"] != null
+            deviceBound = hasBoundFlag && obj.strOrNull("bound") == "true"
+            val devId = obj.strOrNull("devId") ?: return@runCatching null
+            val priv = obj.strOrNull("devPriv")
+                ?.let { runCatching { Base64Codec.decode(it) }.getOrNull() } ?: return@runCatching null
+            val pub = obj.strOrNull("devPub")
+                ?.let { runCatching { Base64Codec.decode(it) }.getOrNull() } ?: return@runCatching null
+            if (priv.size != 32 || pub.size != 32) return@runCatching null
+            // Старый vault без флага: тогда ключи и означали привязку.
+            if (!hasBoundFlag) deviceBound = true
+            DeviceKeys(devId, priv, pub)
+        }.getOrNull()
     }
+
+    /**
+     * Форму ответа задаёт сервер: любое поле может оказаться объектом, массивом
+     * или `null`. `JsonElement.jsonPrimitive` и `.jsonObject` на не-primitive
+     * БРОСАЮТ `IllegalArgumentException`, и тогда вместо `AppException` с
+     * внятным кодом наружу улетает необработанное исключение из API-слоя.
+     * Мягкое приведение (`as?`) превращает «поле не того типа» в «поля нет».
+     * `JsonNull` — подтип `JsonPrimitive`, его отсекает `contentOrNull`.
+     */
+    private fun JsonObject.raw(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+    private fun JsonObject.objOrNull(key: String): JsonObject? = this[key] as? JsonObject
+
+    /**
+     * Непустая строка из поля; null на отсутствии И на не-primitive (объект/массив).
+     * Имя отличается от [str], который отдаёт "" вместо null: на JVM
+     * `JsonObject.str(key)` и `str(o, key)` дали бы одинаковую сигнатуру.
+     */
+    private fun JsonObject.strOrNull(key: String): String? =
+        raw(key)?.takeIf { it.isNotBlank() }
 
     private fun persistState() {
         val dev = device
@@ -378,7 +436,7 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
             expectedUsername?.trim()?.takeIf { it.isNotEmpty() }?.let { put("username", it) }
         }, session = null)
         pendingBind = kp
-        token = data["token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: token
+        token = data.strOrNull("token") ?: token
         return data
     }
 
@@ -396,10 +454,10 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
     }
 
     private fun str(o: JsonObject, key: String): String =
-        o[key]?.jsonPrimitive?.content?.trim().orEmpty()
+        o.raw(key)?.trim().orEmpty()
 
     private fun obj(o: JsonObject, key: String): JsonObject =
-        o[key]?.let { runCatching { it.jsonObject }.getOrNull() } ?: JsonObject(emptyMap())
+        o.objOrNull(key) ?: JsonObject(emptyMap())
 
     /**
      * Регистрация нового аккаунта и привязка установки в один шаг.
@@ -574,10 +632,10 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
 
     /** Расшифровать внутренний L2-ответ: {err, data|error}. */
     private fun openL2(data: JsonObject, respKey: ByteArray, ts: Long, nonce: String): JsonObject {
-        val env = data["__l2__"]?.jsonObject
+        val env = data.objOrNull("__l2__")
             ?: throw AppException(AppErrorCode.MALFORMED, "l2 response envelope missing")
-        val iv = env["iv"]?.jsonPrimitive?.content?.let { runCatching { Base64Codec.decode(it) }.getOrNull() }
-        val ct = env["ct"]?.jsonPrimitive?.content?.let { runCatching { Base64Codec.decode(it) }.getOrNull() }
+        val iv = env.raw("iv")?.let { runCatching { Base64Codec.decode(it) }.getOrNull() }
+        val ct = env.raw("ct")?.let { runCatching { Base64Codec.decode(it) }.getOrNull() }
         if (iv == null || ct == null || iv.size != AppSecure.IV_SIZE || ct.size < 16) {
             throw AppException(AppErrorCode.MALFORMED, "l2 envelope invalid")
         }
@@ -586,11 +644,18 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
             ?: throw AppException(AppErrorCode.MALFORMED, "l2 decrypt failed")
         val inner = runCatching { json.parseToJsonElement(String(plain, Charsets.UTF_8)).jsonObject }.getOrNull()
             ?: throw AppException(AppErrorCode.MALFORMED, "l2 malformed response")
-        val err = inner["err"]?.jsonPrimitive?.content?.toIntOrNull() ?: AppErrorCode.MALFORMED
+        val err = inner.raw("err")?.toIntOrNull() ?: AppErrorCode.MALFORMED
         if (err != AppErrorCode.OK) {
-            throw AppException(err, inner["error"]?.jsonPrimitive?.content ?: "err=$err")
+            // Внутри запечатанного конверта — обычный err обработчика (гостевой
+            // Forbidden и т.п.), а не транспортная ошибка L2: внешний роут заменяет
+            // любую plaintext-ошибку внутреннего роута на 107 'l2 gateway error'
+            // ещё до запечатывания. l2AwareErrorCode здесь — страховка на случай,
+            // если сервер начнёт класть такие тексты внутрь конверта; на бизнес-ошибках
+            // (в т.ч. «Forbidden») она не срабатывает.
+            val innerMsg = inner.raw("error") ?: "err=$err"
+            throw AppException(l2AwareErrorCode(err, innerMsg), innerMsg)
         }
-        return inner["data"]?.jsonObject ?: JsonObject(emptyMap())
+        return inner.objOrNull("data") ?: JsonObject(emptyMap())
     }
 
     /**
@@ -621,7 +686,16 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         val key = currentKey
         val ts = nowAdjusted()
         val nonce = Base64Codec.encode(randomBytes(AppSecure.NONCE_SIZE))
-        val useL2 = key != null && op in AppApi.L2_OPS && session != null && srvXPub != null
+        // Fail-closed для L2. Сервер проверяет заголовок x-azrael-l2, а не сам факт
+        // попадания op в L2_OPS: если клиент не приложил конверт, запрос просто
+        // обрабатывается открытым — без ошибки. Значит «ключа L2 нет» нельзя
+        // выражать как useL2=false: тогда чаты, файлы, инвайты, OTP-секрет и
+        // profile.update ушли бы сайту в открытом виде. Синхронизировано с
+        // app/api/app/v1/route.ts (L2_OPS) и Http.*.kt (ключ по умолчанию).
+        if (op in AppApi.L2_OPS && srvXPub == null) {
+            throw AppException(AppErrorCode.L2_UNAVAILABLE, "l2 server key not configured")
+        }
+        val useL2 = key != null && op in AppApi.L2_OPS && session != null
         val l2 = if (useL2) sealL2(args, ts, nonce, op) else null
         val plainJson = json.encodeToString(
             AppRequest.serializer(),
@@ -681,11 +755,12 @@ class AppClient(private val baseUrl: String, private val appKey: ByteArray? = nu
         val root = runCatching {
             json.parseToJsonElement(resp.body ?: "").jsonObject
         }.getOrElse { throw AppException(AppErrorCode.MALFORMED, "malformed response") }
-        val err = root["err"]?.jsonPrimitive?.content?.toIntOrNull() ?: AppErrorCode.MALFORMED
+        val err = root.raw("err")?.toIntOrNull() ?: AppErrorCode.MALFORMED
         if (err != AppErrorCode.OK) {
-            throw AppException(err, root["error"]?.jsonPrimitive?.content ?: "err=$err")
+            val msg = root.raw("error") ?: "err=$err"
+            throw AppException(l2AwareErrorCode(err, msg), msg)
         }
-        val data = root["data"]?.jsonObject ?: JsonObject(emptyMap())
+        val data = root.objOrNull("data") ?: JsonObject(emptyMap())
         return if (l2 != null) openL2(data, l2.respKey, l2.ts, l2.nonce) else data
     }
 

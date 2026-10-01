@@ -39,7 +39,7 @@ android {
         applicationId = "xyz.azraellab.app"
         minSdk = 33
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = azraelVersion
 
         externalNativeBuild {

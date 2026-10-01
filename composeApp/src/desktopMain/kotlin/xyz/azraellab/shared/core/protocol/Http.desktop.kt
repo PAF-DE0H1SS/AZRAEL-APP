@@ -108,5 +108,10 @@ actual fun defaultAppKeyB64(): String? =
     AppRuntime.appKeyB64?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_APP_KEY")?.takeIf { it.isNotBlank() }
 
 // Статичный X25519-ключ внутреннего L2-слоя из AZRAEL_APP_SRV_X_PUB (raw-32 base64).
+// Без него callOnce уходит в fail-closed (L2_UNAVAILABLE), поэтому значение
+// зашито в сборку так же, как в Http.android.kt, и обязано совпадать с серверным
+// ключом _SRV_X_PUB из /api/app/v2/l2. Это публичный ключ, не секрет.
 actual fun defaultAppSrvPubB64(): String? =
-    AppRuntime.srvXPubB64?.takeIf { it.isNotBlank() } ?: System.getenv("AZRAEL_APP_SRV_X_PUB")?.takeIf { it.isNotBlank() }
+    AppRuntime.srvXPubB64?.takeIf { it.isNotBlank() }
+        ?: System.getenv("AZRAEL_APP_SRV_X_PUB")?.takeIf { it.isNotBlank() }
+        ?: "SIfcrfqv9ri+UhTnQnhi7qEHa3sw+9SnbVpJQRvPTlM="

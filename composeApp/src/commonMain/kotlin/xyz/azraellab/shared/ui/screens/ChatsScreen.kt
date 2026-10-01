@@ -170,6 +170,7 @@ import xyz.azraellab.shared.ui.theme.AzraelSpace
 import xyz.azraellab.shared.data.UiState
 import xyz.azraellab.shared.data.model.DeviceDto
 import xyz.azraellab.shared.data.model.DeviceListDto
+import xyz.azraellab.shared.data.Repos
 import xyz.azraellab.shared.data.vm.AdminViewModel
 import xyz.azraellab.shared.data.vm.ChatsViewModel
 import xyz.azraellab.shared.data.vm.SettingsViewModel
@@ -459,7 +460,10 @@ private fun ChatRoomSection(
     val roomState by vm.room.collectAsUiState()
     val room = roomState.getOrNull()
     val msgs = room?.msgs ?: emptyList()
-    val name = room?.name ?: ""
+    // Имя приходит из списка диалогов; если там этого чата нет (архив, чат удалён
+    // между загрузкой списка и открытием) — показываем нейтральный заголовок,
+    // а не пустую строку.
+    val name = room?.name?.takeIf { it.isNotBlank() } ?: t["chats.room.title"]
     val days = room?.days
     var input by remember { mutableStateOf("") }
     var pendingFile by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -503,7 +507,11 @@ private fun ChatRoomSection(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Label(t["chats.autoDelete"])
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(null to t["off"], 1 to t["d1"], 7 to t["d7"], 30 to t["d30"]).forEach { (d, title) ->
+                    // Сроки берутся из Repos.AUTODELETE_DAYS: UI и проверка в
+                    // Repos.autodeleteSet не должны разъезжаться по набору.
+                    val labels = mapOf(1 to t["d1"], 7 to t["d7"], 30 to t["d30"])
+                    Repos.AUTODELETE_DAYS.forEach { d ->
+                        val title = if (d == null) t["off"] else labels[d] ?: d.toString()
                         AccentButton(if (d == days) "• $title" else title) {
                             scope.launch {
                                 when (val r = vm.setAutodelete(chatId, d)) {

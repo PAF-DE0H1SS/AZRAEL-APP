@@ -1,7 +1,7 @@
 # Maintainer: azrael <typ.onepatop@gmail.com>
 # Build: makepkg -si (see https://wiki.archlinux.org/title/PKGBUILD)
 pkgname=azrael-app
-pkgver=1.0.0
+pkgver=1.3.3
 pkgrel=1
 pkgdesc="AZRAEL-APP client for azrael-lab.xyz (Compose Multiplatform, Android 13+/Windows 10/11/Linux)"
 arch=('x86_64')

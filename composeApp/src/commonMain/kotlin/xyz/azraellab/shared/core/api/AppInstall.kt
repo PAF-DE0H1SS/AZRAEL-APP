@@ -4,13 +4,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import xyz.azraellab.shared.AppTrap
 import xyz.azraellab.shared.AppVault
 import xyz.azraellab.shared.Hex
 import xyz.azraellab.shared.core.crypto.Base64Codec
 import xyz.azraellab.shared.core.crypto.Crypto
+import xyz.azraellab.shared.data.s
 import xyz.azraellab.shared.logAzraelError
 
 /**
@@ -60,7 +60,7 @@ object AppInstall {
         // Создание ключей — это ещё не привязка к аккаунту, и флаг `bound` обязан
         // стоять явно: иначе AppClient примет такой vault за старый, где ключи
         // появлялись только при привязке, и запретит регистрацию на чистой установке.
-        val bound = state["bound"]?.jsonPrimitive?.content == "true"
+        val bound = state.s("bound") == "true"
         val merged = buildJsonObject {
             state.forEach { (k, v) -> put(k, v) }
             put("devId", devId)
@@ -90,13 +90,13 @@ object AppInstall {
 
     /** devId принимается только вместе с полными ключами: иначе придётся пересоздать. */
     private fun savedDevId(state: JsonObject): String? {
-        val devId = state["devId"]?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val devId = state.s("devId")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         if (b64(state, "devPriv")?.size != 32 || b64(state, "devPub")?.size != 32) return null
         return devId
     }
 
     private fun b64(state: JsonObject, field: String): ByteArray? {
-        val text = state[field]?.jsonPrimitive?.content ?: return null
+        val text = state.s(field) ?: return null
         return runCatching { Base64Codec.decode(text) }.getOrNull()
     }
 }

@@ -24,7 +24,11 @@ import xyz.azraellab.shared.data.UiState
  */
 open class AppViewModel(private val externalScope: CoroutineScope? = null) {
     private val job = SupervisorJob()
-    private val vmScope: CoroutineScope = externalScope ?: CoroutineScope(Dispatchers.Default + job)
+    // `job` добавляется в контекст ВСЕГДА, даже когда подсунут внешний scope:
+    // иначе `close()` отменял бы supervisor, которого нет в контексте vmScope,
+    // и висящие загрузки продолжали бы писать в StateFlow после закрытия.
+    private val vmScope: CoroutineScope =
+        CoroutineScope((externalScope?.coroutineContext ?: Dispatchers.Default) + job)
 
     protected fun launch(block: suspend CoroutineScope.() -> Unit): Job = vmScope.launch(block = block)
 

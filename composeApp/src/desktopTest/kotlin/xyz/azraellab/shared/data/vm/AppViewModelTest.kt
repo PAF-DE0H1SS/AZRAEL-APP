@@ -47,12 +47,20 @@ class AppViewModelTest {
     @Test
     fun closeCancelsPendingLoad() = runBlocking {
         val gate = CompletableDeferred<UiState<String>>()
+        val started = CompletableDeferred<Unit>()
         val vm = ProbeViewModel(CoroutineScope(Dispatchers.Default))
-        vm.load { gate.await() }
-        yield()
+        vm.load {
+            started.complete(Unit)
+            gate.await()
+        }
+        // Ждём, пока загрузка действительно встанет на `gate.await()` — иначе
+        // проверка зависела от того, успел ли планировщик запустить корутину, и
+        // падала при случайной задержке вместо честной гонки.
+        withTimeout(2000) { started.await() }
         vm.close()
         gate.complete(UiState.Ready("late"))
         // После close никаких новых значений: поток остаётся в Loading.
+        yield()
         val still = vm.s.value
         assertEquals(UiState.Loading, still)
     }

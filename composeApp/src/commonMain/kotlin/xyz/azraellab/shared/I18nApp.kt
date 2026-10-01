@@ -257,6 +257,8 @@ internal val APP_RU = mapOf(
     "error.invite" to "Неверный или использованный инвайт-код",
     "error.validation" to "Ошибка заполнения",
     "error.deviceLimit" to "Лимит устройств достигнут",
+    "error.l2.required" to "Сервер требует защищённый канал L2, а запрос ушёл без него. Обновите программу",
+    "error.l2.unavailable" to "Защищённый канал L2 недоступен: нет ключа на устройстве либо канал выключен на сервере",
     "file.picker.unavailable" to "Не удалось взять файл: он слишком большой или не читается",
 )
 
@@ -511,6 +513,8 @@ internal val APP_EN = mapOf(
     "error.invite" to "Wrong or already used invite code",
     "error.validation" to "Validation error",
     "error.deviceLimit" to "Device limit reached",
+    "error.l2.required" to "The server requires the L2 secure channel, but the request went without it. Update the app",
+    "error.l2.unavailable" to "The L2 secure channel is unavailable: no key on this device, or the channel is off on the server",
     "file.picker.unavailable" to "Could not take the file: it is too large or unreadable",
 )
 
@@ -765,6 +769,8 @@ internal val APP_ZH = mapOf(
     "error.invite" to "邀请码错误或已被使用",
     "error.validation" to "填写有误",
     "error.deviceLimit" to "已达到设备数量上限",
+    "error.l2.required" to "服务器要求使用 L2 安全通道，但请求未带。请更新程序",
+    "error.l2.unavailable" to "L2 安全通道不可用：设备上没有密钥，或服务器已关闭该通道",
     "file.picker.unavailable" to "无法获取文件：文件过大或无法读取",
 )
 

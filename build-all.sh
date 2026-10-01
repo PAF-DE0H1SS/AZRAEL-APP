@@ -116,8 +116,36 @@ DESKTOP_JAR=$(ls desktopApp/build/compose/jars/*.jar 2>/dev/null | head -1 || tr
 
 # Linux-форматы: .deb — готовый файл; AppImage в Compose 1.12 — каталог app-image
 # (настоящий .AppImage собирает appimagetool в CI, см. .github/workflows/build.yml).
-DEB=$(ls desktopApp/build/compose/binaries/main/deb/*.deb 2>/dev/null | head -1 || true)
-[ -n "$DEB" ] && cp "$DEB" "$DIST/$(basename "$DEB")"
+# Сырой jpackage-пакет публиковать нельзя: в нём нет Depends на реальные
+# библиотеки и нет .desktop/иконки. scripts/finish-deb.sh дополняет его и
+# даёт *_azrael.deb — в dist кладём только его.
+# Именно *_amd64.deb: общий *.deb подхватывает уже дополненный *_azrael.deb,
+# и повторный прогон давал *_azrael_azrael.deb.
+DEB=$(ls desktopApp/build/compose/binaries/main/deb/*_amd64.deb 2>/dev/null | head -1 || true)
+if [ -n "$DEB" ]; then
+  if ./scripts/finish-deb.sh "$DEB"; then
+    cp "${DEB%.deb}_azrael.deb" "$DIST/"
+    rm -f "${DEB%.deb}_azrael_azrael.deb"
+  else
+    echo "[AZRAEL] ВНИМАНИЕ: finish-deb.sh не отработал, .deb в dist не будет" >&2
+  fi
+fi
+
+# jpackage/dpkg-deb от root оставляют root-owned файлы — ломают сборку azrael.
+# Владельца не хардкодим: берём того, от кого реально запущен скрипт
+# (`sudo -u …` → SUDO_USER), иначе владельца репозитория, иначе ничего.
+if [ "$(id -u)" = "0" ]; then
+  OWNER="${SUDO_USER:-${SUDO_USER_NAME:-}}"
+  if [ -z "$OWNER" ] && command -v stat > /dev/null 2>&1; then
+    OWNER=$(stat -c '%U' . 2>/dev/null || true)
+  fi
+  if [ -n "$OWNER" ] && [ "$OWNER" != "root" ]; then
+    chown -R "$OWNER" "$DIST" 2>/dev/null || \
+      echo "[AZRAEL] ВНИМАНИЕ: не удалось вернуть владельца $OWNER на $DIST" >&2
+  else
+    echo "[AZRAEL] ВНИМАНИЕ: владелец артефактов остался root ($DIST)" >&2
+  fi
+fi
 
 echo "[AZRAEL] === Готово. Артефакты: ==="
 ls -la "$DIST"
